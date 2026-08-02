@@ -6,6 +6,11 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 import re
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import urllib.request
 from datetime import datetime, timedelta
 import copy
 import warnings
@@ -397,6 +402,30 @@ class OptimizedEliminationSystemV4:
         }
 
 # ==============================================================================
+# ฟังก์ชันคำนวณวันออกงวดถัดไป
+# ==============================================================================
+def calculate_next_draw_date(last_date, lotto_name):
+    """คำนวณวันออกงวดถัดไปให้ถูกต้อง รวมถึงวันหยุดพิเศษของไทย"""
+    if any(k in lotto_name for k in ['ไทย', 'ธกส', 'ออมสิน']):
+        year = last_date.year
+        month = last_date.month
+        day = last_date.day
+
+        if month == 12 and day >= 16 and day < 30: return datetime(year, 12, 30)
+        elif month == 12 and day == 30: return datetime(year + 1, 1, 17)
+        elif month == 1 and day == 17: return datetime(year, 2, 1)
+        elif month == 4 and day >= 16: return datetime(year, 5, 2)
+        elif month == 5 and day == 2: return datetime(year, 5, 16)
+        
+        if day < 15: return datetime(year, month, 16)
+        else:
+            next_month = 1 if month == 12 else month + 1
+            next_year = year + 1 if month == 12 else year
+            return datetime(next_year, next_month, 1)
+    else:
+        return last_date + timedelta(days=1)
+
+# ==============================================================================
 # 4. Streamlit UI Elements
 # ==============================================================================
 st.title("🛑 ระบบวิเคราะห์เลขดับ (Candidate Elimination - 7 ดับ)")
@@ -433,15 +462,16 @@ if st.button("🛑 ค้นหาเลขดับ PRO V4", type="primary", us
         _ = sys_status.analyze(0)  # Dummy run to get selected_feat_count
         
         last_date = df['date'].iloc[-1]
+        
         if target_dow_input is not None:
             days_ahead = target_dow_input - last_date.dayofweek
             if days_ahead <= 0: days_ahead += 7
             target_date = last_date + timedelta(days=days_ahead)
             target_dow = target_dow_input
         else:
-            days_ahead = 7 if len(df) <= 1 else (last_date - df['date'].iloc[-2]).days
-            target_date = last_date + timedelta(days=days_ahead)
-            target_dow = target_date.dayofweek
+            # เรียกใช้ฟังก์ชันคำนวณวันที่เราเพิ่งสร้าง
+            target_date = calculate_next_draw_date(last_date, selected_lotto)
+            target_dow = target_date.weekday()
 
         dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
         data_size = len(df)
@@ -503,4 +533,3 @@ if st.button("🛑 ค้นหาเลขดับ PRO V4", type="primary", us
             st.write(f"- 📊 **ดับสถิติ:** {format_dead_output(dead_stat)}")
             st.markdown(f"- 🌟 **ดับสรุปรวม 7 ตัว:** **{format_dead_output(dead_final)}**")
             st.write("---")
-
