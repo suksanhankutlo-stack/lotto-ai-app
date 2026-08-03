@@ -39,61 +39,89 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 st.set_page_config(page_title="Ultimate Lotto AI", page_icon="🎯", layout="wide")
 
+# ปรับ CSS ใหม่ เพิ่มเงาให้ตัวหนังสือลอยเด่นและคมชัดที่สุด
 st.markdown("""
 <style>
 body { translate: no; }
 
-.stApp{
-    background:linear-gradient(135deg,#0f172a,#1e3a8a);
+/* พื้นหลังหลักของเว็บ */
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e3a8a);
 }
 
-.block-container{
-    padding-top:1rem;
-    padding-bottom:2rem;
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
 }
 
-h1,h2,h3{
-    color:white;
+/* บังคับตัวอักษรทั่วไปให้เป็นสีขาว และเพิ่มเงา (Drop Shadow) ให้ตัวหนังสือเด้งออกมาชัดๆ */
+h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
+    color: #ffffff !important;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    font-weight: 500;
 }
 
-div[data-testid="stMetric"]{
-    background:white;
-    border-radius:18px;
-    padding:15px;
-    box-shadow:0 4px 15px rgba(0,0,0,.25);
+/* --- ส่วนของกล่อง Metric (เด่นบน, ล่าง, จำนวนข้อมูล) --- */
+div[data-testid="stMetric"] {
+    background: #ffffff !important;
+    border-radius: 18px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.3);
+}
+/* บังคับตัวหนังสือในกล่อง Metric ให้เป็นสีดำเข้ม ลบเงาออก และทำตัวหนา */
+div[data-testid="stMetric"] p, 
+div[data-testid="stMetric"] span, 
+div[data-testid="stMetric"] label,
+div[data-testid="stMetricValue"] > div {
+    color: #0f172a !important;
+    text-shadow: none !important;
+    font-weight: bold !important;
 }
 
-div[data-testid="stMetric"] label, div[data-testid="stMetric"] div {
-    color: #1e293b !important; 
+/* --- ส่วนของปุ่มกด --- */
+.stButton>button {
+    width: 100%;
+    border-radius: 12px;
+    height: 55px;
+    font-size: 18px;
+    font-weight: bold;
+    background: linear-gradient(90deg, #2563eb, #7c3aed) !important;
+    color: #ffffff !important;
+    border: none;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5) !important;
+}
+.stButton>button:hover {
+    transform: scale(1.03);
 }
 
-.stButton>button{
-    width:100%;
-    border-radius:12px;
-    height:55px;
-    font-size:18px;
-    font-weight:bold;
-    background:linear-gradient(90deg,#2563eb,#7c3aed);
-    color:white;
-    border:none;
+/* --- ส่วนของกล่องเจาะลึก (Expander) --- */
+div[data-testid="stExpander"] {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+div[data-testid="stExpanderDetails"] {
+    background: transparent !important;
 }
 
-.stButton>button:hover{
-    transform:scale(1.03);
-}
-
-.stMarkdown p, .stText, label {
-    color: white !important;
-}
-.stSelectbox label {
-    color: white !important;
-}
-.stExpander {
-    background: rgba(255,255,255,0.1);
+/* --- ส่วนของกล่องแจ้งเตือน (Alert/Info/Success) --- */
+div[data-testid="stAlert"] {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
     border-radius: 10px;
 }
+/* เอาเงาออกจากกล่องแจ้งเตือนเพื่อความสะอาดตา แต่ออกตัวหนาแทน */
+div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {
+    color: #ffffff !important;
+    text-shadow: none !important;
+    font-weight: 600 !important;
+}
+
+/* สีตัวหนังสือใน Dropdown (Selectbox) ให้เป็นสีดำตอนกดเลือก */
 div[role="listbox"] span {
     color: #1e293b !important;
+    text-shadow: none !important;
+    font-weight: bold !important;
 }
 </style>
 <meta name="google" content="notranslate">
@@ -352,12 +380,10 @@ class PatternBacktestSystemHot:
 class AISystemHot:
     def __init__(self, lottery_id, data_length):
         self.lottery_id = lottery_id
-        # ปรับลดความซับซ้อนให้เบาลง (Cloud Optimized) ป้องกัน Throttled
         if data_length >= 700: self.trees, self.depth = 80, 5  
         elif data_length >= 400: self.trees, self.depth = 60, 4  
         elif data_length >= 200: self.trees, self.depth = 40, 3  
         else: self.trees, self.depth = 30, 3  
-        # บังคับใช้ n_jobs=1 เพื่อไม่ให้ CPU ชนขีดจำกัดของ Streamlit Cloud
         self.estimators = [  
             ('hgb', HistGradientBoostingClassifier(max_iter=self.trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
             ('xgb', XGBClassifier(n_estimators=self.trees, max_depth=max(1, self.depth-1), learning_rate=0.05, subsample=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)),  
@@ -816,6 +842,7 @@ if btn_hot:
         
         progress = st.progress(0)
         for i in range(100):
+            time.sleep(0.01)
             progress.progress(i + 1)
         progress.empty()
         
@@ -836,7 +863,7 @@ if btn_hot:
         c2.metric("⬇️ เด่นล่างรวม", ", ".join([str(x[0]) for x in top5_bot]))
         c3.metric("📊 ข้อมูล (งวด)", len(df_raw))
         
-        st.write(f"🔮 ผลวิเคราะห์เลขเด่น ประจำวัน{dow_names[next_date.dayofweek]}ที่ {next_date.strftime('%d-%m-%Y')}")
+        st.write(f"🔮 ผลวิเคราะห์เลขเด่น ประจำวัน{dow_names[next_date.weekday()]}ที่ {next_date.strftime('%d-%m-%Y')}")
 
         for pos in ['H', 'T', 'O', 'T2', 'O2']:  
             with st.expander(f"📍 เจาะลึกเลขเด่น: {labels[pos]}"):
@@ -900,6 +927,7 @@ elif btn_cold:
                 
         progress = st.progress(0)
         for i in range(100):
+            time.sleep(0.01)
             progress.progress(i + 1)
         progress.empty()
         
