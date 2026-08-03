@@ -345,7 +345,6 @@ class AISystemHot:
             calib_method = 'isotonic' if len(X_train) >= 200 else 'sigmoid'  
             calib_cv = 3 if len(X_train) >= 150 else 2  
             self.model = CalibratedClassifierCV(best_base, method=calib_method, cv=calib_cv)  
-            
             try: self.model.fit(X_train, y_train_enc, sample_weight=sample_weight)  
             except: 
                 try: self.model.fit(X_train, y_train_enc)
@@ -740,9 +739,10 @@ with col2:
     selected_day_name = st.selectbox("📅 ออกวัน:", list(day_options.keys()))
     target_dow_input = day_options[selected_day_name]
 
+# แบ่งปุ่มกดออกเป็น 2 โหมด และปรับให้เป็นสีแดงเหมือนกันทั้งคู่ (type="primary")
 btn_col1, btn_col2 = st.columns(2)
 with btn_col1: btn_hot = st.button("🚀 วิเคราะห์เลขเด่น (V.Max)", type="primary", use_container_width=True)
-with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", use_container_width=True)
+with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", type="primary", use_container_width=True)
 
 dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]  
 
@@ -854,6 +854,33 @@ elif btn_cold:
                 st.write(f"- 📅 **ดับกำลังวัน:** {format_dead(get_dead_nums(res['day']))}")
                 st.write(f"- 📊 **ดับสถิติ:** {format_dead(get_dead_nums(res['stat']))}")
                 st.markdown(f"- 🌟 **ดับสรุปรวม 7 ตัว:** **{format_dead(get_dead_nums(res['final']))}**")
+
+        # --- เพิ่มกราฟสำหรับเลขดับ (7 ตัวที่โอกาสออกน้อยสุด) ---
+        st.subheader("📊 กราฟโอกาสความน่าจะเป็น (เลขดับ 7 อันดับ)")
+        fig = plt.figure(figsize=(12, 8))  
+        # เลือกใช้สีโทนเย็น (Cold Colors) สำหรับแสดงเลขดับ
+        colors_list_cold = ['#1f77b4', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94']  
+        
+        # จัดชื่อหัวกราฟให้สั้นกระชับเหมือนเลขเด่น
+        clean_labels = {
+            '💯 3 ตัวบน (ร้อย)': 'หลักร้อย (บน)',
+            '🔟 3 ตัวบน (สิบ)': 'หลักสิบ (บน)',
+            '1️⃣ 3 ตัวบน (หน่วย)': 'หลักหน่วย (บน)',
+            '🔽 2 ตัวล่าง (สิบ)': 'หลักสิบ (ล่าง)',
+            '⬇️ 2 ตัวล่าง (หน่วย)': 'หลักหน่วย (ล่าง)'
+        }
+        
+        for idx, (pos_th, res) in enumerate(results_output.items()):
+            ax = plt.subplot(2, 3, idx + 1)  
+            dead_7_items = get_dead_nums(res['final'], 7)  
+            # แสดงกราฟแท่งโดยดึงค่าความน่าจะเป็นที่ต่ำสุด 7 อันดับแรก
+            ax.bar([str(x[0]) for x in dead_7_items], [x[1]*100 for x in dead_7_items], color=colors_list_cold)  
+            ax.set_title(clean_labels.get(pos_th, pos_th))  
+            ax.set_ylabel('โอกาส (%)')  
+            
+        plt.tight_layout()  
+        st.pyplot(fig)  
+        plt.close(fig)
 
     except requests.exceptions.RequestException as e: st.error(f"❌ Network Error: {str(e)}")
     except Exception as e: st.error(f"❌ Error: {str(e)}")
