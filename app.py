@@ -29,6 +29,7 @@ from sklearn.feature_selection import mutual_info_classif
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import log_loss
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.preprocessing import LabelEncoder
 from sklearn.base import clone
 from xgboost import XGBClassifier
 
@@ -315,6 +316,10 @@ class AISystemHot:
 
     def analyze(self, X_train, y_train, X_next, pos, data_hash, sample_weight=None):  
         model_path = os.path.join(CACHE_DIR, f"m_ai_calib_turbo_{self.lottery_id}_{pos}_{data_hash}.joblib")  
+        
+        le = LabelEncoder()
+        y_train_enc = pd.Series(le.fit_transform(y_train), index=y_train.index)
+
         if not os.path.exists(model_path):  
             for old_file in glob.glob(os.path.join(CACHE_DIR, f"m_ai_calib_turbo_{self.lottery_id}_{pos}_*.joblib")):  
                 try: os.remove(old_file)  
@@ -325,11 +330,12 @@ class AISystemHot:
                     score_v, score_s = 0, 0  
                     for train_idx, val_idx in tscv.split(X_train):  
                         voting = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
-                        voting.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
-                        score_v += log_loss(y_train.iloc[val_idx], voting.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
+                        voting.fit(X_train.iloc[train_idx], y_train_enc.iloc[train_idx])  
+                        score_v += log_loss(y_train_enc.iloc[val_idx], voting.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
+                        
                         stacking = StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=-1)  
-                        stacking.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
-                        score_s += log_loss(y_train.iloc[val_idx], stacking.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
+                        stacking.fit(X_train.iloc[train_idx], y_train_enc.iloc[train_idx])  
+                        score_s += log_loss(y_train_enc.iloc[val_idx], stacking.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
                     best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1) if score_v <= score_s else StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=100), cv=2, n_jobs=-1)  
                 else:  
                     best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
@@ -339,19 +345,23 @@ class AISystemHot:
             calib_method = 'isotonic' if len(X_train) >= 200 else 'sigmoid'  
             calib_cv = 3 if len(X_train) >= 150 else 2  
             self.model = CalibratedClassifierCV(best_base, method=calib_method, cv=calib_cv)  
-            try: self.model.fit(X_train, y_train, sample_weight=sample_weight)  
+            
+            try: self.model.fit(X_train, y_train_enc, sample_weight=sample_weight)  
             except: 
-                try: self.model.fit(X_train, y_train)
+                try: self.model.fit(X_train, y_train_enc)
                 except: 
                     self.model = clone(best_base)
-                    self.model.fit(X_train, y_train)
+                    self.model.fit(X_train, y_train_enc)
             joblib.dump(self.model, model_path)  
         else:  
             self.model = joblib.load(model_path)  
 
         probs_raw = self.model.predict_proba(X_next)[0]  
         res = np.zeros(10)  
-        for c, p in zip(self.model.classes_, probs_raw): res[int(c)] = p  
+        for idx, c in enumerate(self.model.classes_):
+            actual_c = le.inverse_transform([int(c)])[0]
+            res[int(actual_c)] = probs_raw[idx]  
+            
         if res.sum() == 0: res = np.ones(10) / 10
         return res / res.sum()
 
@@ -432,14 +442,21 @@ class EnsembleEngineHot:
                 curr_train_len = len(X_all_fs) - bt_size + i  
                 X_train_step, y_train_step = X_all_fs.iloc[:curr_train_len], df_hist[pos].iloc[:curr_train_len]  
                 X_test_step, actual_val = X_all_fs.iloc[[curr_train_len]], df_hist[pos].iloc[curr_train_len]  
-                try: bt_ai_model.fit(X_train_step, y_train_step)  
+                
+                le = LabelEncoder()
+                y_train_step_enc = pd.Series(le.fit_transform(y_train_step), index=y_train_step.index)
+
+                try: bt_ai_model.fit(X_train_step, y_train_step_enc)  
                 except: 
                     bt_ai_model = VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
-                    bt_ai_model.fit(X_train_step, y_train_step)
+                    bt_ai_model.fit(X_train_step, y_train_step_enc)
                 
                 probs_ai = bt_ai_model.predict_proba(X_test_step)[0]  
                 ai_res = np.zeros(10)  
-                for idx, c in enumerate(bt_ai_model.classes_): ai_res[int(c)] = probs_ai[idx]  
+                for idx, c in enumerate(bt_ai_model.classes_):
+                    actual_c = le.inverse_transform([int(c)])[0]
+                    ai_res[int(actual_c)] = probs_ai[idx]  
+                
                 if ai_res.sum() == 0: ai_res = np.ones(10)/10
                 else: ai_res /= ai_res.sum()
 
@@ -619,13 +636,18 @@ class OptimizedEliminationSystemV4:
         bt_train_X, bt_train_y = X_train.iloc[:-test_size], y_train.iloc[:-test_size]
         bt_test_X, bt_test_y = X_train.iloc[-test_size:], y_train.iloc[-test_size:].values
 
+        le = LabelEncoder()
+        bt_train_y_enc = le.fit_transform(bt_train_y)
+
         ai_fails, stat_fails, day_fails = 0, 0, 0
-        trained_models = {name: clone(model).fit(bt_train_X, bt_train_y) for name, model in self.models.items()}
+        trained_models = {name: clone(model).fit(bt_train_X, bt_train_y_enc) for name, model in self.models.items()}
         ai_preds = np.zeros((test_size, 10))
         for name, m in trained_models.items():
             preds = m.predict_proba(bt_test_X)
             full_preds = np.zeros((test_size, 10))
-            for idx, c in enumerate(m.classes_): full_preds[:, int(c)] = preds[:, idx]
+            for idx, c in enumerate(m.classes_): 
+                actual_c = le.inverse_transform([int(c)])[0]
+                full_preds[:, int(actual_c)] = preds[:, idx]
             ai_preds += full_preds * self.model_weights_dict[name]
         ai_preds /= sum(self.model_weights_dict.values())
 
@@ -656,7 +678,10 @@ class OptimizedEliminationSystemV4:
         X, y = self.df_feat[feature_cols], self.df_feat[self.target_col]
         train_X, test_X, train_y, df_hist_cut = X.iloc[:-1], X.iloc[-1:], y.iloc[:-1], df_hist.iloc[:-1]
 
-        selector = ExtraTreesClassifier(n_estimators=30, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y)
+        le = LabelEncoder()
+        train_y_enc = pd.Series(le.fit_transform(train_y), index=train_y.index)
+
+        selector = ExtraTreesClassifier(n_estimators=30, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y_enc)
         top_n = min(40 if data_size >= 400 else 30 if data_size >= 200 else 20, len(feature_cols))
         selected_features = [feature_cols[i] for i in np.argsort(selector.feature_importances_)[::-1][:top_n]]
         self.selected_feat_count = len(selected_features)
@@ -673,14 +698,16 @@ class OptimizedEliminationSystemV4:
 
         cache_key = f"{self.lotto_name}_{self.target_col}_{df_hist['date'].iloc[-1].strftime('%Y-%m-%d')}_ultimate_fs"
         if cache_key not in st.session_state.model_cache:
-            st.session_state.model_cache[cache_key] = {name: clone(model).fit(train_X, train_y) for name, model in self.models.items()}
+            st.session_state.model_cache[cache_key] = {name: clone(model).fit(train_X, train_y_enc) for name, model in self.models.items()}
         trained_models = st.session_state.model_cache[cache_key]
 
         ai_probs = np.zeros(10)
         for name, model in trained_models.items():
             preds = model.predict_proba(test_X)[0]
             m_probs = np.zeros(10)
-            for idx, c in enumerate(model.classes_): m_probs[int(c)] = preds[idx]
+            for idx, c in enumerate(model.classes_): 
+                actual_c = le.inverse_transform([int(c)])[0]
+                m_probs[int(actual_c)] = preds[idx]
             ai_probs += m_probs * self.model_weights_dict[name]
         ai_probs /= (sum(self.model_weights_dict.values()) or 1.0)
         ai_probs /= (ai_probs.sum() + 1e-9)
@@ -713,7 +740,6 @@ with col2:
     selected_day_name = st.selectbox("📅 ออกวัน:", list(day_options.keys()))
     target_dow_input = day_options[selected_day_name]
 
-# แบ่งปุ่มกดออกเป็น 2 โหมด
 btn_col1, btn_col2 = st.columns(2)
 with btn_col1: btn_hot = st.button("🚀 วิเคราะห์เลขเด่น (V.Max)", type="primary", use_container_width=True)
 with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", use_container_width=True)
