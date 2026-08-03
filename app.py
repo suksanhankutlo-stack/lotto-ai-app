@@ -29,7 +29,6 @@ from sklearn.feature_selection import mutual_info_classif
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import log_loss
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import LabelEncoder
 from sklearn.base import clone
 from xgboost import XGBClassifier
 
@@ -40,9 +39,18 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 st.set_page_config(page_title="Ultimate Lotto Analyzer", page_icon="🎯", layout="wide")
 
+# โค้ดบังคับไม่ให้ Chrome แปลภาษาอัตโนมัติ และปรับขนาดฟอนต์ให้สวยงามบนมือถือ
 st.markdown("""
     <style>
         body { translate: no; }
+        
+        /* ปรับขนาดตัวอักษรหัวข้อให้พอดีกับหน้าจอมือถือ */
+        h1 { font-size: 1.8rem !important; line-height: 1.3 !important; margin-bottom: 0.5rem !important; }
+        h2 { font-size: 1.4rem !important; line-height: 1.3 !important; margin-top: 1rem !important; }
+        h3 { font-size: 1.2rem !important; line-height: 1.3 !important; }
+        
+        /* ตกแต่งปุ่มให้ดูละมุนขึ้น */
+        .stButton>button { border-radius: 8px; font-weight: bold; }
     </style>
     <meta name="google" content="notranslate">
 """, unsafe_allow_html=True)
@@ -316,10 +324,6 @@ class AISystemHot:
 
     def analyze(self, X_train, y_train, X_next, pos, data_hash, sample_weight=None):  
         model_path = os.path.join(CACHE_DIR, f"m_ai_calib_turbo_{self.lottery_id}_{pos}_{data_hash}.joblib")  
-        
-        le = LabelEncoder()
-        y_train_enc = pd.Series(le.fit_transform(y_train), index=y_train.index)
-
         if not os.path.exists(model_path):  
             for old_file in glob.glob(os.path.join(CACHE_DIR, f"m_ai_calib_turbo_{self.lottery_id}_{pos}_*.joblib")):  
                 try: os.remove(old_file)  
@@ -330,12 +334,11 @@ class AISystemHot:
                     score_v, score_s = 0, 0  
                     for train_idx, val_idx in tscv.split(X_train):  
                         voting = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
-                        voting.fit(X_train.iloc[train_idx], y_train_enc.iloc[train_idx])  
-                        score_v += log_loss(y_train_enc.iloc[val_idx], voting.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
-                        
+                        voting.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
+                        score_v += log_loss(y_train.iloc[val_idx], voting.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
                         stacking = StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=-1)  
-                        stacking.fit(X_train.iloc[train_idx], y_train_enc.iloc[train_idx])  
-                        score_s += log_loss(y_train_enc.iloc[val_idx], stacking.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
+                        stacking.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
+                        score_s += log_loss(y_train.iloc[val_idx], stacking.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
                     best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1) if score_v <= score_s else StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=100), cv=2, n_jobs=-1)  
                 else:  
                     best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
@@ -345,22 +348,19 @@ class AISystemHot:
             calib_method = 'isotonic' if len(X_train) >= 200 else 'sigmoid'  
             calib_cv = 3 if len(X_train) >= 150 else 2  
             self.model = CalibratedClassifierCV(best_base, method=calib_method, cv=calib_cv)  
-            try: self.model.fit(X_train, y_train_enc, sample_weight=sample_weight)  
+            try: self.model.fit(X_train, y_train, sample_weight=sample_weight)  
             except: 
-                try: self.model.fit(X_train, y_train_enc)
+                try: self.model.fit(X_train, y_train)
                 except: 
                     self.model = clone(best_base)
-                    self.model.fit(X_train, y_train_enc)
+                    self.model.fit(X_train, y_train)
             joblib.dump(self.model, model_path)  
         else:  
             self.model = joblib.load(model_path)  
 
         probs_raw = self.model.predict_proba(X_next)[0]  
         res = np.zeros(10)  
-        for idx, c in enumerate(self.model.classes_):
-            actual_c = le.inverse_transform([int(c)])[0]
-            res[int(actual_c)] = probs_raw[idx]  
-            
+        for c, p in zip(self.model.classes_, probs_raw): res[int(c)] = p  
         if res.sum() == 0: res = np.ones(10) / 10
         return res / res.sum()
 
@@ -441,21 +441,14 @@ class EnsembleEngineHot:
                 curr_train_len = len(X_all_fs) - bt_size + i  
                 X_train_step, y_train_step = X_all_fs.iloc[:curr_train_len], df_hist[pos].iloc[:curr_train_len]  
                 X_test_step, actual_val = X_all_fs.iloc[[curr_train_len]], df_hist[pos].iloc[curr_train_len]  
-                
-                le = LabelEncoder()
-                y_train_step_enc = pd.Series(le.fit_transform(y_train_step), index=y_train_step.index)
-
-                try: bt_ai_model.fit(X_train_step, y_train_step_enc)  
+                try: bt_ai_model.fit(X_train_step, y_train_step)  
                 except: 
                     bt_ai_model = VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
-                    bt_ai_model.fit(X_train_step, y_train_step_enc)
+                    bt_ai_model.fit(X_train_step, y_train_step)
                 
                 probs_ai = bt_ai_model.predict_proba(X_test_step)[0]  
                 ai_res = np.zeros(10)  
-                for idx, c in enumerate(bt_ai_model.classes_):
-                    actual_c = le.inverse_transform([int(c)])[0]
-                    ai_res[int(actual_c)] = probs_ai[idx]  
-                
+                for idx, c in enumerate(bt_ai_model.classes_): ai_res[int(c)] = probs_ai[idx]  
                 if ai_res.sum() == 0: ai_res = np.ones(10)/10
                 else: ai_res /= ai_res.sum()
 
@@ -499,7 +492,7 @@ class EnsembleEngineHot:
             'Probs_For_Graph': final_score, 'BT_Msg': bt_msg + " [Turbo Applied]", 'Feat_Count': self.final_feat_count  
         }  
 
-    def predict_all(self, status_container):  
+    def predict_all(self):  
         last_date = self.df_raw['Date'].iloc[-1]  
         if self.target_dow is not None:  
             days_ahead = self.target_dow - last_date.dayofweek  
@@ -518,7 +511,6 @@ class EnsembleEngineHot:
         results = []  
           
         for pos in ['H', 'T', 'O', 'T2', 'O2']:  
-            status_container.write(f"กำลังวิเคราะห์โมเดลตำแหน่ง {pos}...")
             results.append(self._process_single_position(pos, df_hist, X_all, next_x, next_date))  
               
         return {pos: data for pos, data in results}, next_date
@@ -635,18 +627,13 @@ class OptimizedEliminationSystemV4:
         bt_train_X, bt_train_y = X_train.iloc[:-test_size], y_train.iloc[:-test_size]
         bt_test_X, bt_test_y = X_train.iloc[-test_size:], y_train.iloc[-test_size:].values
 
-        le = LabelEncoder()
-        bt_train_y_enc = le.fit_transform(bt_train_y)
-
         ai_fails, stat_fails, day_fails = 0, 0, 0
-        trained_models = {name: clone(model).fit(bt_train_X, bt_train_y_enc) for name, model in self.models.items()}
+        trained_models = {name: clone(model).fit(bt_train_X, bt_train_y) for name, model in self.models.items()}
         ai_preds = np.zeros((test_size, 10))
         for name, m in trained_models.items():
             preds = m.predict_proba(bt_test_X)
             full_preds = np.zeros((test_size, 10))
-            for idx, c in enumerate(m.classes_): 
-                actual_c = le.inverse_transform([int(c)])[0]
-                full_preds[:, int(actual_c)] = preds[:, idx]
+            for idx, c in enumerate(m.classes_): full_preds[:, int(c)] = preds[:, idx]
             ai_preds += full_preds * self.model_weights_dict[name]
         ai_preds /= sum(self.model_weights_dict.values())
 
@@ -677,10 +664,7 @@ class OptimizedEliminationSystemV4:
         X, y = self.df_feat[feature_cols], self.df_feat[self.target_col]
         train_X, test_X, train_y, df_hist_cut = X.iloc[:-1], X.iloc[-1:], y.iloc[:-1], df_hist.iloc[:-1]
 
-        le = LabelEncoder()
-        train_y_enc = pd.Series(le.fit_transform(train_y), index=train_y.index)
-
-        selector = ExtraTreesClassifier(n_estimators=30, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y_enc)
+        selector = ExtraTreesClassifier(n_estimators=30, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y)
         top_n = min(40 if data_size >= 400 else 30 if data_size >= 200 else 20, len(feature_cols))
         selected_features = [feature_cols[i] for i in np.argsort(selector.feature_importances_)[::-1][:top_n]]
         self.selected_feat_count = len(selected_features)
@@ -697,16 +681,14 @@ class OptimizedEliminationSystemV4:
 
         cache_key = f"{self.lotto_name}_{self.target_col}_{df_hist['date'].iloc[-1].strftime('%Y-%m-%d')}_ultimate_fs"
         if cache_key not in st.session_state.model_cache:
-            st.session_state.model_cache[cache_key] = {name: clone(model).fit(train_X, train_y_enc) for name, model in self.models.items()}
+            st.session_state.model_cache[cache_key] = {name: clone(model).fit(train_X, train_y) for name, model in self.models.items()}
         trained_models = st.session_state.model_cache[cache_key]
 
         ai_probs = np.zeros(10)
         for name, model in trained_models.items():
             preds = model.predict_proba(test_X)[0]
             m_probs = np.zeros(10)
-            for idx, c in enumerate(model.classes_): 
-                actual_c = le.inverse_transform([int(c)])[0]
-                m_probs[int(actual_c)] = preds[idx]
+            for idx, c in enumerate(model.classes_): m_probs[int(c)] = preds[idx]
             ai_probs += m_probs * self.model_weights_dict[name]
         ai_probs /= (sum(self.model_weights_dict.values()) or 1.0)
         ai_probs /= (ai_probs.sum() + 1e-9)
@@ -730,7 +712,10 @@ class OptimizedEliminationSystemV4:
 # ==============================================================================
 # 4. Dashboard (UI ของ Streamlit)
 # ==============================================================================
-st.title("🎯 ระบบวิเคราะห์หวยครบวงจร (เด่น V.Max & ดับ PRO V4)")
+
+# ปรับเปลี่ยนการแสดงผลหัวข้อให้ดูดีขึ้นแทน st.title แบบเดิม
+st.markdown("<h1 style='text-align: center;'>🎯 ระบบวิเคราะห์หวยครบวงจร<br><span style='font-size: 1.2rem; color: #666;'>(เด่น V.Max & ดับ PRO V4)</span></h1>", unsafe_allow_html=True)
+st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1: selected_lotto = st.selectbox("🎯 เลือกหวย:", list(LOTTERY_URLS.keys()))
@@ -739,10 +724,10 @@ with col2:
     selected_day_name = st.selectbox("📅 ออกวัน:", list(day_options.keys()))
     target_dow_input = day_options[selected_day_name]
 
-# แบ่งปุ่มกดออกเป็น 2 โหมด และปรับให้เป็นสีแดงเหมือนกันทั้งคู่ (type="primary")
+# แบ่งปุ่มกดออกเป็น 2 โหมด
 btn_col1, btn_col2 = st.columns(2)
 with btn_col1: btn_hot = st.button("🚀 วิเคราะห์เลขเด่น (V.Max)", type="primary", use_container_width=True)
-with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", type="primary", use_container_width=True)
+with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", use_container_width=True)
 
 dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]  
 
@@ -752,12 +737,13 @@ dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤห
 if btn_hot:
     url = LOTTERY_URLS[selected_lotto]
     try:
-        with st.status("🚀 โหมดเลขเด่น: กำลังดึงข้อมูลและเตรียมวิเคราะห์...", expanded=True) as status:
-            df_raw = fetch_data_hot(url)
-            status.write("ดึงข้อมูลสำเร็จ! กำลังสร้างฟีเจอร์...")
-            engine = EnsembleEngineHot(df_raw, selected_lotto, target_dow=target_dow_input)
-            preds, next_date = engine.predict_all(status)
-            status.update(label="✨ วิเคราะห์เสร็จสิ้นสมบูรณ์!", state="complete", expanded=False)
+        st.warning("🚀 โหมดเลขเด่น: กำลังดึงข้อมูลและวิเคราะห์... (อาจใช้เวลา 1-2 นาที กรุณารอจนกว่าจะเสร็จ)")
+        
+        df_raw = fetch_data_hot(url)
+        engine = EnsembleEngineHot(df_raw, selected_lotto, target_dow=target_dow_input)
+        preds, next_date = engine.predict_all()
+        
+        st.success("✨ วิเคราะห์เสร็จสิ้นสมบูรณ์!")
         
         labels = {'H': 'หลักร้อย (บน)', 'T': 'หลักสิบ (บน)', 'O': 'หลักหน่วย (บน)', 'T2': 'หลักสิบ (ล่าง)', 'O2': 'หลักหน่วย (ล่าง)'}  
         probs_top = (preds['H']['Probs_For_Graph'] + preds['T']['Probs_For_Graph'] + preds['O']['Probs_For_Graph']) / 3  
@@ -801,37 +787,37 @@ if btn_hot:
 elif btn_cold:
     url = LOTTERY_URLS[selected_lotto]
     try:
-        with st.status("🛑 โหมดเลขดับ: กำลังดึงข้อมูลและเตรียมวิเคราะห์...", expanded=True) as status:
-            df = fetch_data_cold(url)
-            if df is None or df.empty:
-                status.update(label="❌ ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบการเชื่อมต่อ", state="error")
-                st.stop()
-            status.write("ข้อมูลพร้อมใช้งาน! เริ่มกระบวนการ Feature Selection...")
-            
-            sys_status = OptimizedEliminationSystemV4(df, 'hundred', selected_lotto)
-            _ = sys_status.analyze(0)  
-            
-            last_date = df['date'].iloc[-1]
-            if target_dow_input is not None:
-                days_ahead = target_dow_input - last_date.dayofweek
-                if days_ahead <= 0: days_ahead += 7
-                target_date = last_date + timedelta(days=days_ahead)
-                target_dow = target_dow_input
-            else:
-                target_date = calculate_next_draw_date(last_date, selected_lotto)
-                target_dow = target_date.weekday()
+        st.warning("🛑 โหมดเลขดับ: กำลังดึงข้อมูลและเตรียมวิเคราะห์... (อาจใช้เวลา 1-2 นาที กรุณารอจนกว่าจะเสร็จ)")
+        
+        df = fetch_data_cold(url)
+        if df is None or df.empty:
+            st.error("❌ ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบการเชื่อมต่อ")
+            st.stop()
+        
+        sys_status = OptimizedEliminationSystemV4(df, 'hundred', selected_lotto)
+        _ = sys_status.analyze(0)  
+        
+        last_date = df['date'].iloc[-1]
+        if target_dow_input is not None:
+            days_ahead = target_dow_input - last_date.dayofweek
+            if days_ahead <= 0: days_ahead += 7
+            target_date = last_date + timedelta(days=days_ahead)
+            target_dow = target_dow_input
+        else:
+            target_date = calculate_next_draw_date(last_date, selected_lotto)
+            target_dow = target_date.weekday()
 
-            store_final_probs = {}
-            positions = {'💯 3 ตัวบน (ร้อย)': 'hundred', '🔟 3 ตัวบน (สิบ)': 'ten', '1️⃣ 3 ตัวบน (หน่วย)': 'unit', '🔽 2 ตัวล่าง (สิบ)': 'bot_ten', '⬇️ 2 ตัวล่าง (หน่วย)': 'bot_unit'}
-            results_output = {}
-            for pos_th, col_en in positions.items():
-                status.write(f"กำลังสกัดเลขดับ: {pos_th} ...")
-                system = OptimizedEliminationSystemV4(df, col_en, selected_lotto)
-                res = system.analyze(target_dow)
-                if res:
-                    store_final_probs[col_en] = res['final']
-                    results_output[pos_th] = res
-            status.update(label="✨ ประมวลผลเลขดับเสร็จสิ้นสมบูรณ์!", state="complete", expanded=False)
+        store_final_probs = {}
+        positions = {'💯 3 ตัวบน (ร้อย)': 'hundred', '🔟 3 ตัวบน (สิบ)': 'ten', '1️⃣ 3 ตัวบน (หน่วย)': 'unit', '🔽 2 ตัวล่าง (สิบ)': 'bot_ten', '⬇️ 2 ตัวล่าง (หน่วย)': 'bot_unit'}
+        results_output = {}
+        for pos_th, col_en in positions.items():
+            system = OptimizedEliminationSystemV4(df, col_en, selected_lotto)
+            res = system.analyze(target_dow)
+            if res:
+                store_final_probs[col_en] = res['final']
+                results_output[pos_th] = res
+                
+        st.success("✨ ประมวลผลเลขดับเสร็จสิ้นสมบูรณ์!")
 
         def get_dead_nums(probs_array, k=7): return [(idx, probs_array[idx]) for idx in np.argsort(probs_array)[:k]]
         def format_dead(dead_list): return " - ".join([str(num) for num, prob in dead_list])
@@ -854,33 +840,6 @@ elif btn_cold:
                 st.write(f"- 📅 **ดับกำลังวัน:** {format_dead(get_dead_nums(res['day']))}")
                 st.write(f"- 📊 **ดับสถิติ:** {format_dead(get_dead_nums(res['stat']))}")
                 st.markdown(f"- 🌟 **ดับสรุปรวม 7 ตัว:** **{format_dead(get_dead_nums(res['final']))}**")
-
-        # --- เพิ่มกราฟสำหรับเลขดับ (7 ตัวที่โอกาสออกน้อยสุด) ---
-        st.subheader("📊 กราฟโอกาสความน่าจะเป็น (เลขดับ 7 อันดับ)")
-        fig = plt.figure(figsize=(12, 8))  
-        # เลือกใช้สีโทนเย็น (Cold Colors) สำหรับแสดงเลขดับ
-        colors_list_cold = ['#1f77b4', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94']  
-        
-        # จัดชื่อหัวกราฟให้สั้นกระชับเหมือนเลขเด่น
-        clean_labels = {
-            '💯 3 ตัวบน (ร้อย)': 'หลักร้อย (บน)',
-            '🔟 3 ตัวบน (สิบ)': 'หลักสิบ (บน)',
-            '1️⃣ 3 ตัวบน (หน่วย)': 'หลักหน่วย (บน)',
-            '🔽 2 ตัวล่าง (สิบ)': 'หลักสิบ (ล่าง)',
-            '⬇️ 2 ตัวล่าง (หน่วย)': 'หลักหน่วย (ล่าง)'
-        }
-        
-        for idx, (pos_th, res) in enumerate(results_output.items()):
-            ax = plt.subplot(2, 3, idx + 1)  
-            dead_7_items = get_dead_nums(res['final'], 7)  
-            # แสดงกราฟแท่งโดยดึงค่าความน่าจะเป็นที่ต่ำสุด 7 อันดับแรก
-            ax.bar([str(x[0]) for x in dead_7_items], [x[1]*100 for x in dead_7_items], color=colors_list_cold)  
-            ax.set_title(clean_labels.get(pos_th, pos_th))  
-            ax.set_ylabel('โอกาส (%)')  
-            
-        plt.tight_layout()  
-        st.pyplot(fig)  
-        plt.close(fig)
 
     except requests.exceptions.RequestException as e: st.error(f"❌ Network Error: {str(e)}")
     except Exception as e: st.error(f"❌ Error: {str(e)}")
