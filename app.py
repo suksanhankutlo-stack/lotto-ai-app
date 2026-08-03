@@ -39,17 +39,12 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 st.set_page_config(page_title="Ultimate Lotto Analyzer", page_icon="🎯", layout="wide")
 
-# โค้ดบังคับไม่ให้ Chrome แปลภาษาอัตโนมัติ และปรับขนาดฟอนต์ให้สวยงามบนมือถือ
 st.markdown("""
     <style>
         body { translate: no; }
-        
-        /* ปรับขนาดตัวอักษรหัวข้อให้พอดีกับหน้าจอมือถือ */
         h1 { font-size: 1.8rem !important; line-height: 1.3 !important; margin-bottom: 0.5rem !important; }
         h2 { font-size: 1.4rem !important; line-height: 1.3 !important; margin-top: 1rem !important; }
         h3 { font-size: 1.2rem !important; line-height: 1.3 !important; }
-        
-        /* ตกแต่งปุ่มให้ดูละมุนขึ้น */
         .stButton>button { border-radius: 8px; font-weight: bold; }
     </style>
     <meta name="google" content="notranslate">
@@ -343,7 +338,11 @@ class AISystemHot:
                 else:  
                     best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
             except Exception:
-                best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)
+                fallback_estimators = [  
+                    ('hgb', HistGradientBoostingClassifier(max_iter=self.trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
+                    ('et', ExtraTreesClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+                ]
+                best_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
             
             calib_method = 'isotonic' if len(X_train) >= 200 else 'sigmoid'  
             calib_cv = 3 if len(X_train) >= 150 else 2  
@@ -353,7 +352,10 @@ class AISystemHot:
                 try: self.model.fit(X_train, y_train)
                 except: 
                     self.model = clone(best_base)
-                    self.model.fit(X_train, y_train)
+                    try: self.model.fit(X_train, y_train)
+                    except:
+                        self.model = RandomForestClassifier(n_estimators=self.trees, max_depth=self.depth)
+                        self.model.fit(X_train, y_train)
             joblib.dump(self.model, model_path)  
         else:  
             self.model = joblib.load(model_path)  
@@ -434,7 +436,12 @@ class EnsembleEngineHot:
                 ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
             ]  
             try: bt_ai_base = StackingClassifier(estimators=lite_estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=-1) if n >= 500 else VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
-            except: bt_ai_base = VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
+            except: 
+                fallback_estimators = [  
+                    ('hgb', HistGradientBoostingClassifier(max_iter=lite_trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
+                    ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+                ]
+                bt_ai_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
 
             for i in range(bt_size):  
                 bt_ai_model = clone(bt_ai_base)
@@ -443,7 +450,11 @@ class EnsembleEngineHot:
                 X_test_step, actual_val = X_all_fs.iloc[[curr_train_len]], df_hist[pos].iloc[curr_train_len]  
                 try: bt_ai_model.fit(X_train_step, y_train_step)  
                 except: 
-                    bt_ai_model = VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
+                    fallback_estimators = [  
+                        ('hgb', HistGradientBoostingClassifier(max_iter=lite_trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
+                        ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+                    ]
+                    bt_ai_model = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
                     bt_ai_model.fit(X_train_step, y_train_step)
                 
                 probs_ai = bt_ai_model.predict_proba(X_test_step)[0]  
@@ -628,7 +639,16 @@ class OptimizedEliminationSystemV4:
         bt_test_X, bt_test_y = X_train.iloc[-test_size:], y_train.iloc[-test_size:].values
 
         ai_fails, stat_fails, day_fails = 0, 0, 0
-        trained_models = {name: clone(model).fit(bt_train_X, bt_train_y) for name, model in self.models.items()}
+        trained_models = {}
+        for name, model in self.models.items():
+            m = clone(model)
+            try:
+                m.fit(bt_train_X, bt_train_y)
+            except Exception:
+                m = RandomForestClassifier(n_estimators=self.trees, random_state=42, max_depth=self.depth, n_jobs=1)
+                m.fit(bt_train_X, bt_train_y)
+            trained_models[name] = m
+            
         ai_preds = np.zeros((test_size, 10))
         for name, m in trained_models.items():
             preds = m.predict_proba(bt_test_X)
@@ -681,7 +701,17 @@ class OptimizedEliminationSystemV4:
 
         cache_key = f"{self.lotto_name}_{self.target_col}_{df_hist['date'].iloc[-1].strftime('%Y-%m-%d')}_ultimate_fs"
         if cache_key not in st.session_state.model_cache:
-            st.session_state.model_cache[cache_key] = {name: clone(model).fit(train_X, train_y) for name, model in self.models.items()}
+            trained_models = {}
+            for name, model in self.models.items():
+                m = clone(model)
+                try:
+                    m.fit(train_X, train_y)
+                except Exception:
+                    m = RandomForestClassifier(n_estimators=self.trees, random_state=42, max_depth=self.depth, n_jobs=1)
+                    m.fit(train_X, train_y)
+                trained_models[name] = m
+            st.session_state.model_cache[cache_key] = trained_models
+            
         trained_models = st.session_state.model_cache[cache_key]
 
         ai_probs = np.zeros(10)
@@ -713,7 +743,6 @@ class OptimizedEliminationSystemV4:
 # 4. Dashboard (UI ของ Streamlit)
 # ==============================================================================
 
-# ปรับเปลี่ยนการแสดงผลหัวข้อให้ดูดีขึ้นแทน st.title แบบเดิม
 st.markdown("<h1 style='text-align: center;'>🎯 ระบบวิเคราะห์หวยครบวงจร<br><span style='font-size: 1.2rem; color: #666;'>(เด่น V.Max & ดับ PRO V4)</span></h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
 
