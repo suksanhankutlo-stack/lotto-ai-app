@@ -37,17 +37,65 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 # 0. Setup Streamlit, Anti-Translate & Cache
 # ==============================================================================
-st.set_page_config(page_title="Ultimate Lotto Analyzer", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Ultimate Lotto AI", page_icon="🎯", layout="wide")
 
 st.markdown("""
-    <style>
-        body { translate: no; }
-        h1 { font-size: 1.8rem !important; line-height: 1.3 !important; margin-bottom: 0.5rem !important; }
-        h2 { font-size: 1.4rem !important; line-height: 1.3 !important; margin-top: 1rem !important; }
-        h3 { font-size: 1.2rem !important; line-height: 1.3 !important; }
-        .stButton>button { border-radius: 8px; font-weight: bold; }
-    </style>
-    <meta name="google" content="notranslate">
+<style>
+body { translate: no; }
+
+.stApp{
+    background:linear-gradient(135deg,#0f172a,#1e3a8a);
+}
+
+.block-container{
+    padding-top:1rem;
+    padding-bottom:2rem;
+}
+
+h1,h2,h3{
+    color:white;
+}
+
+div[data-testid="stMetric"]{
+    background:white;
+    border-radius:18px;
+    padding:15px;
+    box-shadow:0 4px 15px rgba(0,0,0,.25);
+}
+
+/* บังคับให้ตัวหนังสือใน Metric Card เป็นสีเข้ม เพื่อให้ตัดกับพื้นหลังสีขาว */
+div[data-testid="stMetric"] label, div[data-testid="stMetric"] div {
+    color: #1e293b !important; 
+}
+
+.stButton>button{
+    width:100%;
+    border-radius:12px;
+    height:55px;
+    font-size:18px;
+    font-weight:bold;
+    background:linear-gradient(90deg,#2563eb,#7c3aed);
+    color:white;
+    border:none;
+}
+
+.stButton>button:hover{
+    transform:scale(1.03);
+}
+
+/* ปรับสีอักษรทั่วไปให้เป็นสีขาวให้อ่านง่ายบนพื้นหลังเข้ม */
+.stMarkdown p, .stText, label {
+    color: white !important;
+}
+.stSelectbox label {
+    color: white !important;
+}
+.stExpander {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+</style>
+<meta name="google" content="notranslate">
 """, unsafe_allow_html=True)
 
 @st.cache_resource
@@ -743,8 +791,8 @@ class OptimizedEliminationSystemV4:
 # 4. Dashboard (UI ของ Streamlit)
 # ==============================================================================
 
-st.markdown("<h1 style='text-align: center;'>🎯 ระบบวิเคราะห์หวยครบวงจร<br><span style='font-size: 1.2rem; color: #666;'>(เด่น V.Max & ดับ PRO V4)</span></h1>", unsafe_allow_html=True)
-st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
+st.title("🎯 Ultimate Lotto AI")
+st.caption("V.Max Quantum AI + PRO V4")
 
 col1, col2 = st.columns(2)
 with col1: selected_lotto = st.selectbox("🎯 เลือกหวย:", list(LOTTERY_URLS.keys()))
@@ -755,8 +803,8 @@ with col2:
 
 # แบ่งปุ่มกดออกเป็น 2 โหมด
 btn_col1, btn_col2 = st.columns(2)
-with btn_col1: btn_hot = st.button("🚀 วิเคราะห์เลขเด่น (V.Max)", type="primary", use_container_width=True)
-with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)", use_container_width=True)
+with btn_col1: btn_hot = st.button("🚀 วิเคราะห์เลขเด่น (V.Max)")
+with btn_col2: btn_cold = st.button("🛑 วิเคราะห์เลขดับ (PRO V4)")
 
 dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]  
 
@@ -766,13 +814,20 @@ dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤห
 if btn_hot:
     url = LOTTERY_URLS[selected_lotto]
     try:
-        st.warning("🚀 โหมดเลขเด่น: กำลังดึงข้อมูลและวิเคราะห์... (อาจใช้เวลา 1-2 นาที กรุณารอจนกว่าจะเสร็จ)")
+        st.warning("🚀 โหมดเลขเด่น: กำลังดึงข้อมูลและวิเคราะห์... (โปรดรอสักครู่)")
         
         df_raw = fetch_data_hot(url)
         engine = EnsembleEngineHot(df_raw, selected_lotto, target_dow=target_dow_input)
         preds, next_date = engine.predict_all()
         
-        st.success("✨ วิเคราะห์เสร็จสิ้นสมบูรณ์!")
+        progress = st.progress(0)
+        for i in range(100):
+            time.sleep(0.01)
+            progress.progress(i + 1)
+        progress.empty()
+        
+        status = st.empty()
+        status.success("✨ AI วิเคราะห์เสร็จแล้ว")
         
         labels = {'H': 'หลักร้อย (บน)', 'T': 'หลักสิบ (บน)', 'O': 'หลักหน่วย (บน)', 'T2': 'หลักสิบ (ล่าง)', 'O2': 'หลักหน่วย (ล่าง)'}  
         probs_top = (preds['H']['Probs_For_Graph'] + preds['T']['Probs_For_Graph'] + preds['O']['Probs_For_Graph']) / 3  
@@ -782,9 +837,13 @@ if btn_hot:
         top5_top, top5_bot = get_top5(probs_top), get_top5(probs_bot)  
 
         st.subheader("🔥 สรุปฟันธง เลขเด่นมาแรง (V.Max Quantum)")
-        st.info(f"**🚀 เด่นบนรวม (ร้อย-สิบ-หน่วย) : {' , '.join([str(x[0]) for x in top5_top])}**")
-        st.info(f"**⬇️ เด่นล่างรวม (สิบ-หน่วย) : {' , '.join([str(x[0]) for x in top5_bot])}**")
-        st.write(f"🔮 ผลวิเคราะห์เลขเด่น ประจำวัน{dow_names[next_date.dayofweek]}ที่ {next_date.strftime('%d-%m-%Y')} (อ้างอิง {len(df_raw)} งวด)")
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🚀 เด่นบนรวม", ", ".join([str(x[0]) for x in top5_top]))
+        c2.metric("⬇️ เด่นล่างรวม", ", ".join([str(x[0]) for x in top5_bot]))
+        c3.metric("📊 ข้อมูล (งวด)", len(df_raw))
+        
+        st.write(f"🔮 ผลวิเคราะห์เลขเด่น ประจำวัน{dow_names[next_date.dayofweek]}ที่ {next_date.strftime('%d-%m-%Y')}")
 
         for pos in ['H', 'T', 'O', 'T2', 'O2']:  
             with st.expander(f"📍 เจาะลึกเลขเด่น: {labels[pos]}"):
@@ -816,7 +875,7 @@ if btn_hot:
 elif btn_cold:
     url = LOTTERY_URLS[selected_lotto]
     try:
-        st.warning("🛑 โหมดเลขดับ: กำลังดึงข้อมูลและเตรียมวิเคราะห์... (อาจใช้เวลา 1-2 นาที กรุณารอจนกว่าจะเสร็จ)")
+        st.warning("🛑 โหมดเลขดับ: กำลังดึงข้อมูลและเตรียมวิเคราะห์... (โปรดรอสักครู่)")
         
         df = fetch_data_cold(url)
         if df is None or df.empty:
@@ -846,20 +905,30 @@ elif btn_cold:
                 store_final_probs[col_en] = res['final']
                 results_output[pos_th] = res
                 
-        st.success("✨ ประมวลผลเลขดับเสร็จสิ้นสมบูรณ์!")
+        progress = st.progress(0)
+        for i in range(100):
+            time.sleep(0.01)
+            progress.progress(i + 1)
+        progress.empty()
+        
+        status = st.empty()
+        status.success("✨ AI วิเคราะห์เสร็จแล้ว")
 
         def get_dead_nums(probs_array, k=7): return [(idx, probs_array[idx]) for idx in np.argsort(probs_array)[:k]]
         def format_dead(dead_list): return " - ".join([str(num) for num, prob in dead_list])
 
         st.subheader("🧊 สรุปภาพรวมเลขดับ (PRO V4)")
+        
+        c1, c2, c3 = st.columns(3)
         if all(k in store_final_probs for k in ['hundred', 'ten', 'unit']):
             top_probs = (store_final_probs['hundred'] + store_final_probs['ten'] + store_final_probs['unit']) / 3.0
-            st.info(f"🚫 **ดับบนรวม (ร้อย-สิบ-หน่วย) : {format_dead(get_dead_nums(top_probs, 7))}**")
+            c1.metric("🚫 ดับบนรวม", format_dead(get_dead_nums(top_probs, 7)))
         if all(k in store_final_probs for k in ['bot_ten', 'bot_unit']):
             bot_probs = (store_final_probs['bot_ten'] + store_final_probs['bot_unit']) / 2.0
-            st.info(f"🚫 **ดับล่างรวม (สิบ-หน่วย) : {format_dead(get_dead_nums(bot_probs, 7))}**")
+            c2.metric("🚫 ดับล่างรวม", format_dead(get_dead_nums(bot_probs, 7)))
+        c3.metric("📊 ข้อมูล (งวด)", len(df))
             
-        st.write(f"🔮 ผลวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}ที่ {target_date.strftime('%d-%m-%Y')} (อ้างอิง {len(df)} งวด)")
+        st.write(f"🔮 ผลวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}ที่ {target_date.strftime('%d-%m-%Y')}")
 
         for pos_th, res in results_output.items():
             with st.expander(f"📍 เจาะลึกเลขดับ: {pos_th}"):
@@ -873,5 +942,3 @@ elif btn_cold:
     except requests.exceptions.RequestException as e: st.error(f"❌ Network Error: {str(e)}")
     except Exception as e: st.error(f"❌ Error: {str(e)}")
 
-else:
-    st.info("👈 **กรุณากดปุ่มด้านบนเพื่อเลือกโหมดวิเคราะห์ (เน้นเลขเด่น หรือ หาเลขดับ)**")
