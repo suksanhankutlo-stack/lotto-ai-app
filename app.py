@@ -39,60 +39,79 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 st.set_page_config(page_title="Ultimate Lotto AI", page_icon="🎯", layout="wide")
 
+# แก้ไข CSS บังคับสีข้อความให้เป็นสีขาวตัดกับพื้นหลังเข้ม
 st.markdown("""
 <style>
 body { translate: no; }
 
-.stApp{
-    background:linear-gradient(135deg,#0f172a,#1e3a8a);
+/* พื้นหลังหลักของเว็บ */
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e3a8a);
 }
 
-.block-container{
-    padding-top:1rem;
-    padding-bottom:2rem;
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
 }
 
-h1,h2,h3{
-    color:white;
+/* บังคับตัวอักษรทั่วไปให้เป็นสีขาว */
+h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
+    color: #ffffff !important;
 }
 
-div[data-testid="stMetric"]{
-    background:white;
-    border-radius:18px;
-    padding:15px;
-    box-shadow:0 4px 15px rgba(0,0,0,.25);
+/* --- ส่วนของกล่อง Metric (เด่นบน, ล่าง, จำนวนข้อมูล) --- */
+div[data-testid="stMetric"] {
+    background: #ffffff !important;
+    border-radius: 18px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.25);
+}
+/* บังคับตัวหนังสือในกล่อง Metric ให้เป็นสีเข้ม (เพราะพื้นเป็นสีขาว) */
+div[data-testid="stMetric"] p, 
+div[data-testid="stMetric"] span, 
+div[data-testid="stMetric"] label,
+div[data-testid="stMetricValue"] > div {
+    color: #1e293b !important;
 }
 
-/* บังคับให้ตัวหนังสือใน Metric Card เป็นสีเข้ม เพื่อให้ตัดกับพื้นหลังสีขาว */
-div[data-testid="stMetric"] label, div[data-testid="stMetric"] div {
-    color: #1e293b !important; 
+/* --- ส่วนของปุ่มกด --- */
+.stButton>button {
+    width: 100%;
+    border-radius: 12px;
+    height: 55px;
+    font-size: 18px;
+    font-weight: bold;
+    background: linear-gradient(90deg, #2563eb, #7c3aed) !important;
+    color: #ffffff !important;
+    border: none;
+}
+.stButton>button:hover {
+    transform: scale(1.03);
 }
 
-.stButton>button{
-    width:100%;
-    border-radius:12px;
-    height:55px;
-    font-size:18px;
-    font-weight:bold;
-    background:linear-gradient(90deg,#2563eb,#7c3aed);
-    color:white;
-    border:none;
-}
-
-.stButton>button:hover{
-    transform:scale(1.03);
-}
-
-/* ปรับสีอักษรทั่วไปให้เป็นสีขาวให้อ่านง่ายบนพื้นหลังเข้ม */
-.stMarkdown p, .stText, label {
-    color: white !important;
-}
-.stSelectbox label {
-    color: white !important;
-}
-.stExpander {
-    background: rgba(255,255,255,0.1);
+/* --- ส่วนของกล่องเจาะลึก (Expander) --- */
+div[data-testid="stExpander"] {
+    background: rgba(255, 255, 255, 0.1) !important;
     border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+div[data-testid="stExpanderDetails"] {
+    background: transparent !important;
+}
+
+/* --- ส่วนของกล่องแจ้งเตือน (Alert/Info/Success) --- */
+div[data-testid="stAlert"] {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 10px;
+}
+div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {
+    color: #ffffff !important;
+}
+
+/* สีตัวหนังสือใน Dropdown (Selectbox) ให้เป็นสีดำตอนกดเลือก */
+div[role="listbox"] span {
+    color: #1e293b !important;
 }
 </style>
 <meta name="google" content="notranslate">
@@ -941,4 +960,3 @@ elif btn_cold:
 
     except requests.exceptions.RequestException as e: st.error(f"❌ Network Error: {str(e)}")
     except Exception as e: st.error(f"❌ Error: {str(e)}")
-
