@@ -22,14 +22,100 @@ from xgboost import XGBClassifier
 warnings.filterwarnings('ignore')
 
 # ==============================================================================
-# 0. Setup Streamlit & Anti-Translate
+# 0. Setup Streamlit & Anti-Translate & CSS Styling
 # ==============================================================================
 st.set_page_config(page_title="ระบบวิเคราะห์เลขดับ PRO V4", page_icon="🛑", layout="wide")
 
-# โค้ดบังคับไม่ให้ Chrome แปลภาษาอัตโนมัติ (ป้องกันแอปแครช)
+# โค้ดบังคับไม่ให้ Chrome แปลภาษาอัตโนมัติ และ CSS ตกแต่งหน้าจอ
 st.markdown("""
     <style>
         body { translate: no; }
+        
+        #MainMenu {visibility:hidden;}
+        footer {visibility:hidden;}
+        header {visibility:hidden;}
+
+        .stApp{
+            background:linear-gradient(135deg,#0f172a,#111827,#1e293b);
+            color:white;
+        }
+
+        .main-title{
+            text-align:center;
+            font-size:42px;
+            font-weight:900;
+            color:#FFD700;
+            text-shadow:2px 2px 15px orange;
+            margin-top: 20px;
+        }
+
+        .sub-title{
+            text-align:center;
+            color:#DDDDDD;
+            font-size:18px;
+            margin-bottom:25px;
+        }
+
+        .box{
+            background:#1e293b;
+            border-radius:18px;
+            padding:18px;
+            border:1px solid #334155;
+            box-shadow:0 0 18px rgba(0,255,255,.2);
+            margin-bottom:15px;
+        }
+
+        .result{
+            background:linear-gradient(90deg,#0ea5e9,#0284c7);
+            border-radius:15px;
+            padding:18px;
+            color:white;
+            font-size:22px;
+            font-weight:bold;
+            text-align:center;
+            margin-top:20px;
+            margin-bottom:15px;
+        }
+
+        .dead{
+            background:#7f1d1d;
+            color:white;
+            padding:12px;
+            border-radius:10px;
+            font-size:20px;
+            margin-top:10px;
+            text-align:center;
+            box-shadow:0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        div.stButton>button{
+            width:100%;
+            height:60px;
+            border-radius:15px;
+            font-size:22px;
+            font-weight:bold;
+            background:linear-gradient(90deg,#ff9800,#ff5722);
+            color:white;
+            border: none;
+        }
+
+        div.stButton>button:hover{
+            background:linear-gradient(90deg,#ffd54f,#ff9800);
+            transform:scale(1.02);
+            transition: 0.3s;
+        }
+
+        div[data-baseweb="select"]{
+            background:#1e293b;
+            border-radius:12px;
+        }
+
+        .metric{
+            text-align:center;
+            font-size:28px;
+            font-weight:bold;
+            color:#00E5FF;
+        }
     </style>
     <meta name="google" content="notranslate">
 """, unsafe_allow_html=True)
@@ -425,12 +511,25 @@ def calculate_next_draw_date(last_date, lotto_name):
     else:
         return last_date + timedelta(days=1)
 
+
 # ==============================================================================
 # 4. Streamlit UI Elements
 # ==============================================================================
-st.title("🛑 ระบบวิเคราะห์เลขดับ (Candidate Elimination - 7 ดับ)")
-st.markdown("*(PRO V4 Ultimate + FS Edition)*")
 
+# หัวแอปพลิเคชันแบบใหม่
+st.markdown("""
+<div class="main-title">
+🛑 LOTTO AI PRO V4
+</div>
+
+<div class="sub-title">
+Ultimate Candidate Elimination System<br>
+AI + XGBoost + Markov + Feature Selection
+</div>
+""", unsafe_allow_html=True)
+
+# กล่องเลือกข้อมูล
+st.markdown('<div class="box">', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
     selected_lotto = st.selectbox("🎯 เลือกหวย:", list(LOTTERY_URLS.keys()))
@@ -441,6 +540,8 @@ with col2:
     }
     selected_day_name = st.selectbox("📅 ออกวัน:", list(day_options.keys()))
     target_dow_input = day_options[selected_day_name]
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 def get_dead_numbers(probs_array, k=7):
     return [(idx, probs_array[idx]) for idx in np.argsort(probs_array)[:k]]
@@ -448,6 +549,7 @@ def get_dead_numbers(probs_array, k=7):
 def format_dead_output(dead_list):
     return " - ".join([str(num) for num, prob in dead_list])
 
+# ปุ่มกดค้นหา
 if st.button("🛑 ค้นหาเลขดับ PRO V4", type="primary", use_container_width=True):
     with st.status("กำลังเชื่อมต่อและประมวลผลข้อมูล...", expanded=True) as status:
         df = fetch_data(selected_lotto)
@@ -494,26 +596,54 @@ if st.button("🛑 ค้นหาเลขดับ PRO V4", type="primary", us
         status.update(label="✨ ประมวลผลเลขดับเสร็จสิ้นสมบูรณ์!", state="complete", expanded=False)
 
     # --- Render Dashboard ---
-    st.success(f"🔮 ผลวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}ที่ {target_date.strftime('%d/%m/%Y')} (อ้างอิง {data_size} งวด)")
     
-    with st.expander("⚙️ ดูการตั้งค่าระบบและน้ำหนัก AI", expanded=False):
+    # การ์ดสรุปผล
+    st.markdown(f"""
+    <div class="result">
+    🔮 ผลวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}<br>
+    วันที่ {target_date.strftime('%d/%m/%Y')}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # กล่องแสดงเลขดับรวม
+    if all(k in store_final_probs for k in ['hundred', 'ten', 'unit']):
+        top_probs = (store_final_probs['hundred'] + store_final_probs['ten'] + store_final_probs['unit']) / 3.0
+        st.markdown(f"""
+        <div class="dead">
+        🚫 ดับบนรวม (ร้อย-สิบ-หน่วย)<br>
+        {format_dead_output(get_dead_numbers(top_probs, 7))}
+        </div>
+        """, unsafe_allow_html=True)
+
+    if all(k in store_final_probs for k in ['bot_ten', 'bot_unit']):
+        bot_probs = (store_final_probs['bot_ten'] + store_final_probs['bot_unit']) / 2.0
+        st.markdown(f"""
+        <div class="dead" style="background:#431407;">
+        ⬇️ ดับล่างรวม (สิบ-หน่วย)<br>
+        {format_dead_output(get_dead_numbers(bot_probs, 7))}
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.write("---")
+
+    # ตัวชี้วัดระบบแบบ 4 คอลัมน์ (Metrics)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📊 จำนวนงวด", f"{data_size}")
+    c2.metric("✂️ Features", f"{sys_status.selected_feat_count}")
+    c3.metric("🌲 Trees", f"{sys_status.trees}")
+    c4.metric("⚙️ Mode", sys_status.mode_name.split()[0]) # เอาแค่คำว่า Mode X
+    
+    st.write("---")
+
+    # การตั้งค่าระบบ
+    with st.expander("⚙️ ดูรายละเอียดการตั้งค่าระบบและน้ำหนัก AI", expanded=False):
         weights_str = f"RF={sys_status.ai_weights[0]} | ET={sys_status.ai_weights[1]} | HGB={sys_status.ai_weights[2]} | XGB={sys_status.ai_weights[3]}"
         st.write(f"**สเตตัสระบบ [{sys_status.mode_name}]:** 🌲 Trees = {sys_status.trees} | 🔄 BT = {sys_status.test_size} (Max Depth: {sys_status.depth})")
         st.write(f"**โครงสร้างข้อมูล:** Lags {sys_status.lags} | Rolling {sys_status.rolls} | เพิ่มลูกเล่นวงล้อ (Sin/Cos)")
         st.write(f"**การกรอง (FS):** ระบบคัดเฉพาะฟีเจอร์หัวกะทิ Top {sys_status.selected_feat_count} มาใช้ประมวลผล")
         st.write(f"**น้ำหนัก AI 4 สำนัก:** {weights_str}")
         
-    st.subheader("🔥 สรุปภาพรวมเลขดับ (คัดเลขที่มีโอกาสออกน้อยที่สุด 7 อันดับ)")
-    
-    if all(k in store_final_probs for k in ['hundred', 'ten', 'unit']):
-        top_probs = (store_final_probs['hundred'] + store_final_probs['ten'] + store_final_probs['unit']) / 3.0
-        st.info(f"🚫 **ดับบนรวม (ร้อย-สิบ-หน่วย) : {format_dead_output(get_dead_numbers(top_probs, 7))}**")
 
-    if all(k in store_final_probs for k in ['bot_ten', 'bot_unit']):
-        bot_probs = (store_final_probs['bot_ten'] + store_final_probs['bot_unit']) / 2.0
-        st.info(f"🚫 **ดับล่างรวม (สิบ-หน่วย) : {format_dead_output(get_dead_numbers(bot_probs, 7))}**")
-
-    st.write("---")
     st.write("### 📍 เจาะลึกเลขดับในแต่ละหลัก")
     for pos_th, res in results_output.items():
         with st.container():
