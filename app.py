@@ -18,6 +18,7 @@ import warnings
 # --- Machine Learning Modules ---
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, HistGradientBoostingClassifier
 from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder  # นำเข้า LabelEncoder เพื่อแก้ปัญหาคลาสตัวเลขข้ามของ XGBoost
 
 warnings.filterwarnings('ignore')
 
@@ -342,11 +343,23 @@ class OptimizedEliminationSystemV4:
         bt_test_X = X_train.iloc[-test_size:]
         bt_test_y = y_train.iloc[-test_size:].values
 
+        # 🌟 ป้องกัน Error กรณีข้อมูลถูกหั่นจนเหลือตัวเลือกน้อยเกินไป
+        if len(np.unique(bt_train_y)) < 2:
+            return 0, 0, 0
+
         ai_fails = 0
         trained_models = {}
+        
         for name, model in self.models.items():
             m = copy.deepcopy(model)
-            m.fit(bt_train_X, bt_train_y)
+            # 🌟 แปลง Label เฉพาะให้ XGBoost ไม่ Error
+            if name == 'xgb':
+                le = LabelEncoder()
+                _ytrain = le.fit_transform(bt_train_y)
+                m.fit(bt_train_X, _ytrain)
+                m.le = le # เก็บตัวแปลงไว้
+            else:
+                m.fit(bt_train_X, bt_train_y)
             trained_models[name] = m
 
         ai_preds = np.zeros((test_size, 10))
@@ -355,8 +368,16 @@ class OptimizedEliminationSystemV4:
         for name, m in trained_models.items():
             preds = m.predict_proba(bt_test_X)
             full_preds = np.zeros((test_size, 10))
-            for idx, c in enumerate(m.classes_):
-                full_preds[:, int(c)] = preds[:, idx]
+            
+            # 🌟 แปลงผลลัพธ์กลับเป็นคลาสปกติ
+            if name == 'xgb':
+                for idx, c_enc in enumerate(m.classes_):
+                    c_orig = m.le.inverse_transform([int(c_enc)])[0]
+                    full_preds[:, int(c_orig)] = preds[:, idx]
+            else:
+                for idx, c in enumerate(m.classes_):
+                    full_preds[:, int(c)] = preds[:, idx]
+                    
             ai_preds += full_preds * self.model_weights_dict[name]
         ai_preds /= total_ai_weight
 
@@ -449,7 +470,14 @@ class OptimizedEliminationSystemV4:
         else:
             trained_models = {}
             for name, model in self.models.items():
-                model.fit(train_X, train_y)
+                # 🌟 แปลง Label เฉพาะให้ XGBoost ตอนทำจริง
+                if name == 'xgb':
+                    le = LabelEncoder()
+                    _ytrain = le.fit_transform(train_y)
+                    model.fit(train_X, _ytrain)
+                    model.le = le
+                else:
+                    model.fit(train_X, train_y)
                 trained_models[name] = model
             st.session_state.model_cache[cache_key] = trained_models
 
@@ -457,8 +485,16 @@ class OptimizedEliminationSystemV4:
         for name, model in trained_models.items():
             preds = model.predict_proba(test_X)[0]
             model_probs = np.zeros(10)
-            for idx, c in enumerate(model.classes_):
-                model_probs[int(c)] = preds[idx]
+            
+            # 🌟 แปลงกลับเป็นค่าจริง
+            if name == 'xgb':
+                for idx, c_enc in enumerate(model.classes_):
+                    c_orig = model.le.inverse_transform([int(c_enc)])[0]
+                    model_probs[int(c_orig)] = preds[idx]
+            else:
+                for idx, c in enumerate(model.classes_):
+                    model_probs[int(c)] = preds[idx]
+                    
             ai_probs += model_probs * self.model_weights_dict[name]
 
         ai_probs /= total_ai_weight
