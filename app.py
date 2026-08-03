@@ -39,77 +39,59 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 st.set_page_config(page_title="Ultimate Lotto AI", page_icon="🎯", layout="wide")
 
-# แก้ไข CSS บังคับสีข้อความให้เป็นสีขาวตัดกับพื้นหลังเข้ม
 st.markdown("""
 <style>
 body { translate: no; }
 
-/* พื้นหลังหลักของเว็บ */
-.stApp {
-    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+.stApp{
+    background:linear-gradient(135deg,#0f172a,#1e3a8a);
 }
 
-.block-container {
-    padding-top: 1rem;
-    padding-bottom: 2rem;
+.block-container{
+    padding-top:1rem;
+    padding-bottom:2rem;
 }
 
-/* บังคับตัวอักษรทั่วไปให้เป็นสีขาว */
-h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
-    color: #ffffff !important;
+h1,h2,h3{
+    color:white;
 }
 
-/* --- ส่วนของกล่อง Metric (เด่นบน, ล่าง, จำนวนข้อมูล) --- */
-div[data-testid="stMetric"] {
-    background: #ffffff !important;
-    border-radius: 18px;
-    padding: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,.25);
-}
-/* บังคับตัวหนังสือในกล่อง Metric ให้เป็นสีเข้ม (เพราะพื้นเป็นสีขาว) */
-div[data-testid="stMetric"] p, 
-div[data-testid="stMetric"] span, 
-div[data-testid="stMetric"] label,
-div[data-testid="stMetricValue"] > div {
-    color: #1e293b !important;
+div[data-testid="stMetric"]{
+    background:white;
+    border-radius:18px;
+    padding:15px;
+    box-shadow:0 4px 15px rgba(0,0,0,.25);
 }
 
-/* --- ส่วนของปุ่มกด --- */
-.stButton>button {
-    width: 100%;
-    border-radius: 12px;
-    height: 55px;
-    font-size: 18px;
-    font-weight: bold;
-    background: linear-gradient(90deg, #2563eb, #7c3aed) !important;
-    color: #ffffff !important;
-    border: none;
-}
-.stButton>button:hover {
-    transform: scale(1.03);
+div[data-testid="stMetric"] label, div[data-testid="stMetric"] div {
+    color: #1e293b !important; 
 }
 
-/* --- ส่วนของกล่องเจาะลึก (Expander) --- */
-div[data-testid="stExpander"] {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-div[data-testid="stExpanderDetails"] {
-    background: transparent !important;
+.stButton>button{
+    width:100%;
+    border-radius:12px;
+    height:55px;
+    font-size:18px;
+    font-weight:bold;
+    background:linear-gradient(90deg,#2563eb,#7c3aed);
+    color:white;
+    border:none;
 }
 
-/* --- ส่วนของกล่องแจ้งเตือน (Alert/Info/Success) --- */
-div[data-testid="stAlert"] {
-    background: rgba(255, 255, 255, 0.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+.stButton>button:hover{
+    transform:scale(1.03);
+}
+
+.stMarkdown p, .stText, label {
+    color: white !important;
+}
+.stSelectbox label {
+    color: white !important;
+}
+.stExpander {
+    background: rgba(255,255,255,0.1);
     border-radius: 10px;
 }
-div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {
-    color: #ffffff !important;
-}
-
-/* สีตัวหนังสือใน Dropdown (Selectbox) ให้เป็นสีดำตอนกดเลือก */
 div[role="listbox"] span {
     color: #1e293b !important;
 }
@@ -123,9 +105,7 @@ def setup_thai_font():
     if not os.path.exists(font_path):
         try: 
             urllib.request.urlretrieve("https://github.com/Phonbopit/sarabun-webfont/raw/master/fonts/thsarabunnew-webfont.ttf", font_path)
-        except Exception: 
-            pass
-
+        except Exception: pass
     if os.path.exists(font_path):  
         fm.fontManager.addfont(font_path)  
         plt.rc('font', family='TH Sarabun New', size=14)  
@@ -183,7 +163,7 @@ def calculate_next_draw_date(last_date, lotto_name):
         return last_date + timedelta(days=1)
 
 # ==============================================================================
-# 1. ระบบดึงข้อมูล (แยกสำหรับ เด่น และ ดับ)
+# 1. ระบบดึงข้อมูล
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def fetch_data_hot(url):
@@ -246,7 +226,7 @@ def fetch_data_cold(url):
     except Exception: return None
 
 # ==============================================================================
-# 2. ระบบเลขเด่น (HOT) - V.Max
+# 2. ระบบเลขเด่น (HOT) - V.Max (Cloud Optimized)
 # ==============================================================================
 @st.cache_data
 def build_features_hot(df, lags, rolls):
@@ -372,17 +352,19 @@ class PatternBacktestSystemHot:
 class AISystemHot:
     def __init__(self, lottery_id, data_length):
         self.lottery_id = lottery_id
-        if data_length >= 700: self.trees, self.depth = 120, 6  
-        elif data_length >= 400: self.trees, self.depth = 100, 5  
-        elif data_length >= 200: self.trees, self.depth = 80, 4  
-        else: self.trees, self.depth = 60, 3  
+        # ปรับลดความซับซ้อนให้เบาลง (Cloud Optimized) ป้องกัน Throttled
+        if data_length >= 700: self.trees, self.depth = 80, 5  
+        elif data_length >= 400: self.trees, self.depth = 60, 4  
+        elif data_length >= 200: self.trees, self.depth = 40, 3  
+        else: self.trees, self.depth = 30, 3  
+        # บังคับใช้ n_jobs=1 เพื่อไม่ให้ CPU ชนขีดจำกัดของ Streamlit Cloud
         self.estimators = [  
             ('hgb', HistGradientBoostingClassifier(max_iter=self.trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
-            ('xgb', XGBClassifier(n_estimators=self.trees, max_depth=max(1, self.depth-1), learning_rate=0.05, subsample=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=-1)),  
-            ('et', ExtraTreesClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=-1)),
-            ('rf', RandomForestClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+            ('xgb', XGBClassifier(n_estimators=self.trees, max_depth=max(1, self.depth-1), learning_rate=0.05, subsample=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)),  
+            ('et', ExtraTreesClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=1)),
+            ('rf', RandomForestClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=1))  
         ]  
-        self.model_name = "Turbo Calibrated AI"  
+        self.model_name = "Turbo Calibrated AI (Lite)"  
 
     def analyze(self, X_train, y_train, X_next, pos, data_hash, sample_weight=None):  
         model_path = os.path.join(CACHE_DIR, f"m_ai_calib_turbo_{self.lottery_id}_{pos}_{data_hash}.joblib")  
@@ -395,21 +377,21 @@ class AISystemHot:
                     tscv = TimeSeriesSplit(n_splits=2)  
                     score_v, score_s = 0, 0  
                     for train_idx, val_idx in tscv.split(X_train):  
-                        voting = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
+                        voting = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=1)  
                         voting.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
                         score_v += log_loss(y_train.iloc[val_idx], voting.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
-                        stacking = StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=-1)  
+                        stacking = StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=30), cv=2, n_jobs=1)  
                         stacking.fit(X_train.iloc[train_idx], y_train.iloc[train_idx])  
                         score_s += log_loss(y_train.iloc[val_idx], stacking.predict_proba(X_train.iloc[val_idx]), labels=np.arange(10))  
-                    best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1) if score_v <= score_s else StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=100), cv=2, n_jobs=-1)  
+                    best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=1) if score_v <= score_s else StackingClassifier(estimators=self.estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=1)  
                 else:  
-                    best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=-1)  
+                    best_base = VotingClassifier(estimators=self.estimators, voting='soft', n_jobs=1)  
             except Exception:
                 fallback_estimators = [  
                     ('hgb', HistGradientBoostingClassifier(max_iter=self.trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
-                    ('et', ExtraTreesClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+                    ('et', ExtraTreesClassifier(n_estimators=self.trees//2, max_depth=self.depth, class_weight='balanced', random_state=42, n_jobs=1))  
                 ]
-                best_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
+                best_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=1)
             
             calib_method = 'isotonic' if len(X_train) >= 200 else 'sigmoid'  
             calib_cv = 3 if len(X_train) >= 150 else 2  
@@ -421,7 +403,7 @@ class AISystemHot:
                     self.model = clone(best_base)
                     try: self.model.fit(X_train, y_train)
                     except:
-                        self.model = RandomForestClassifier(n_estimators=self.trees, max_depth=self.depth)
+                        self.model = RandomForestClassifier(n_estimators=self.trees, max_depth=self.depth, n_jobs=1)
                         self.model.fit(X_train, y_train)
             joblib.dump(self.model, model_path)  
         else:  
@@ -441,8 +423,8 @@ class EnsembleEngineHot:
         self.lottery_id = lottery_name.split(".")[0].strip()
         n = len(df_raw)
         
-        self.test_size = 15 if n >= 700 else 12 if n >= 400 else 8 if n >= 200 else 4
-        if n < 100: self.test_size = min(3, max(0, n - 30))  
+        self.test_size = 10 if n >= 400 else 5 if n >= 150 else 3
+        if n < 100: self.test_size = min(2, max(0, n - 30))  
 
         self.lags, self.rolls = ([1, 2, 3] if n < 200 else [1, 2, 3, 5]), [3, 5, 10]  
         self.features = ['DayOfWeek', 'DrawIndex', 'DigitSum_3D', 'Sum_2D']  
@@ -453,7 +435,7 @@ class EnsembleEngineHot:
             for w in self.rolls: self.features.extend([f'EMA_{w}_{pos}', f'Roll_Med_{w}_{pos}', f'Roll_Std_{w}_{pos}', f'Momentum_{w}_{pos}'])  
 
         hash_array = pd.util.hash_pandas_object(df_raw[['Result_3D', 'Result_2D']], index=False).values  
-        self.data_hash = f"{hashlib.md5(hash_array).hexdigest()}_{self.test_size}_turbo_vmax"  
+        self.data_hash = f"{hashlib.md5(hash_array).hexdigest()}_{self.test_size}_turbo_vmax_lite"  
 
         self.pos_sys, self.freq_sys = PositionalEquation(), FrequencyEngineHot()  
         self.cond_sys, self.markov_sys = ConditionalSystemHot(), MarkovChainSystemHot()  
@@ -472,7 +454,7 @@ class EnsembleEngineHot:
         mi_series = pd.Series(mi_scores, index=valid_features)  
         
         mi_thresh = 0.010 if n >= 700 else 0.008 if n >= 400 else 0.005 if n >= 200 else 0.002
-        target_feats = min(len(valid_features), max(30, int(n * 0.15)))  
+        target_feats = min(len(valid_features), max(20, int(n * 0.10)))  
         pre_selected = mi_series[mi_series > mi_thresh].sort_values(ascending=False).head(target_feats * 2).index  
         if len(pre_selected) < 10: pre_selected = valid_features[:target_feats]  
           
@@ -496,19 +478,16 @@ class EnsembleEngineHot:
             norm_weights, bt_msg = self.base_weights, "(ข้อมูลน้อย ข้าม Backtest)"  
         else:  
             scores = {k: 0.0 for k in self.base_weights.keys()}  
-            lite_trees = max(20, self.ai_sys.trees // 3)  
+            lite_trees = max(15, self.ai_sys.trees // 3)  
             lite_estimators = [  
                 ('hgb', HistGradientBoostingClassifier(max_iter=lite_trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
-                ('xgb', XGBClassifier(n_estimators=lite_trees, max_depth=max(1, self.ai_sys.depth-1), learning_rate=0.05, subsample=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=-1)),  
-                ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
+                ('xgb', XGBClassifier(n_estimators=lite_trees, max_depth=max(1, self.ai_sys.depth-1), learning_rate=0.05, subsample=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)),  
+                ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=1))  
             ]  
-            try: bt_ai_base = StackingClassifier(estimators=lite_estimators, final_estimator=LogisticRegression(class_weight='balanced', max_iter=50), cv=2, n_jobs=-1) if n >= 500 else VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=-1)
+            try: bt_ai_base = VotingClassifier(estimators=lite_estimators, voting='soft', n_jobs=1)
             except: 
-                fallback_estimators = [  
-                    ('hgb', HistGradientBoostingClassifier(max_iter=lite_trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
-                    ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
-                ]
-                bt_ai_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
+                fallback_estimators = [('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, random_state=42, n_jobs=1))]
+                bt_ai_base = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=1)
 
             for i in range(bt_size):  
                 bt_ai_model = clone(bt_ai_base)
@@ -517,11 +496,7 @@ class EnsembleEngineHot:
                 X_test_step, actual_val = X_all_fs.iloc[[curr_train_len]], df_hist[pos].iloc[curr_train_len]  
                 try: bt_ai_model.fit(X_train_step, y_train_step)  
                 except: 
-                    fallback_estimators = [  
-                        ('hgb', HistGradientBoostingClassifier(max_iter=lite_trees, max_leaf_nodes=15, min_samples_leaf=3, random_state=42)),  
-                        ('et', ExtraTreesClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, class_weight='balanced', random_state=42, n_jobs=-1))  
-                    ]
-                    bt_ai_model = VotingClassifier(estimators=fallback_estimators, voting='soft', n_jobs=-1)
+                    bt_ai_model = RandomForestClassifier(n_estimators=lite_trees, max_depth=self.ai_sys.depth, n_jobs=1)
                     bt_ai_model.fit(X_train_step, y_train_step)
                 
                 probs_ai = bt_ai_model.predict_proba(X_test_step)[0]  
@@ -567,7 +542,7 @@ class EnsembleEngineHot:
             'Calendar': sorted([(i, p_cal[i]) for i in range(10)], key=lambda x: x[1], reverse=True)[:5],  
             'Markov': sorted([(i, p_mk[i]) for i in range(10)], key=lambda x: x[1], reverse=True)[:5],  
             'Final': sorted([(i, final_score[i]) for i in range(10)], key=lambda x: x[1], reverse=True)[:5],  
-            'Probs_For_Graph': final_score, 'BT_Msg': bt_msg + " [Turbo Applied]", 'Feat_Count': self.final_feat_count  
+            'Probs_For_Graph': final_score, 'BT_Msg': bt_msg + " [Lite Applied]", 'Feat_Count': self.final_feat_count  
         }  
 
     def predict_all(self):  
@@ -594,7 +569,7 @@ class EnsembleEngineHot:
         return {pos: data for pos, data in results}, next_date
 
 # ==============================================================================
-# 3. ระบบเลขดับ (COLD) - PRO V4
+# 3. ระบบเลขดับ (COLD) - PRO V4 (Cloud Optimized)
 # ==============================================================================
 @st.cache_data
 def build_features_adaptive_cold(df, col, lags, rolls):
@@ -649,24 +624,24 @@ class OptimizedEliminationSystemV4:
         n = len(self.df)
 
         if n >= 700:
-            self.mode_name, self.trees, self.test_size, self.depth = "Mode 4 (700+ งวด)", 100, 20, 6
+            self.mode_name, self.trees, self.test_size, self.depth = "Mode 4 (700+ งวด)", 80, 15, 6
             self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20], (1.0, 1.0, 1.0, 1.0)
         elif n >= 400:
-            self.mode_name, self.trees, self.test_size, self.depth = "Mode 3 (400-699 งวด)", 100, 20, 5
+            self.mode_name, self.trees, self.test_size, self.depth = "Mode 3 (400-699 งวด)", 60, 10, 5
             self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20], (1.0, 0.9, 0.8, 1.0)
         elif n >= 200:
-            self.mode_name, self.trees, self.test_size, self.depth = "Mode 2 (200-399 งวด)", 80, 15, 4
+            self.mode_name, self.trees, self.test_size, self.depth = "Mode 2 (200-399 งวด)", 40, 8, 4
             self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8], [3, 5, 10, 20], (1.0, 0.8, 0.6, 0.5)
         else:
-            self.mode_name, self.trees, self.test_size, self.depth = "Mode 1 (100-199 งวด)", 60, 10, 3
+            self.mode_name, self.trees, self.test_size, self.depth = "Mode 1 (100-199 งวด)", 30, 5, 3
             self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5], [3, 5, 10], (1.0, 0.8, 0.5, 0.15)
-        if n < 100: self.test_size = min(5, max(0, n - 30))
+        if n < 100: self.test_size = min(3, max(0, n - 30))
 
         self.models = {
             'rf': RandomForestClassifier(n_estimators=self.trees, random_state=42, max_depth=self.depth, n_jobs=1),
             'et': ExtraTreesClassifier(n_estimators=self.trees, random_state=42, max_depth=self.depth, n_jobs=1),
-            'hgb': HistGradientBoostingClassifier(random_state=42, max_iter=50),
-            'xgb': XGBClassifier(n_estimators=50, max_depth=self.depth, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)
+            'hgb': HistGradientBoostingClassifier(random_state=42, max_iter=30),
+            'xgb': XGBClassifier(n_estimators=30, max_depth=self.depth, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)
         }
         self.model_weights_dict = {'rf': self.ai_weights[0], 'et': self.ai_weights[1], 'hgb': self.ai_weights[2], 'xgb': self.ai_weights[3]}
         self.df_feat = build_features_adaptive_cold(self.df, self.target_col, tuple(self.lags), tuple(self.rolls))
@@ -699,7 +674,7 @@ class OptimizedEliminationSystemV4:
         return (0.5 * min(freq * 10, 1.0)) + (0.5 * max(1.0 - (skip / 30), 0.0))
 
     def run_backtest(self, X_train, y_train, df_hist_cut, test_size):
-        cache_key = f"bt_{self.lotto_name}_{self.target_col}_{len(df_hist_cut)}_{test_size}_ultimate_fs"
+        cache_key = f"bt_{self.lotto_name}_{self.target_col}_{len(df_hist_cut)}_{test_size}_ultimate_fs_lite"
         if cache_key in st.session_state.bt_cache: return st.session_state.bt_cache[cache_key]
 
         bt_train_X, bt_train_y = X_train.iloc[:-test_size], y_train.iloc[:-test_size]
@@ -751,8 +726,8 @@ class OptimizedEliminationSystemV4:
         X, y = self.df_feat[feature_cols], self.df_feat[self.target_col]
         train_X, test_X, train_y, df_hist_cut = X.iloc[:-1], X.iloc[-1:], y.iloc[:-1], df_hist.iloc[:-1]
 
-        selector = ExtraTreesClassifier(n_estimators=30, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y)
-        top_n = min(40 if data_size >= 400 else 30 if data_size >= 200 else 20, len(feature_cols))
+        selector = ExtraTreesClassifier(n_estimators=20, max_depth=5, random_state=42, n_jobs=1).fit(train_X, train_y)
+        top_n = min(30 if data_size >= 400 else 20 if data_size >= 200 else 15, len(feature_cols))
         selected_features = [feature_cols[i] for i in np.argsort(selector.feature_importances_)[::-1][:top_n]]
         self.selected_feat_count = len(selected_features)
         train_X, test_X = train_X[selected_features], test_X[selected_features]
@@ -766,7 +741,7 @@ class OptimizedEliminationSystemV4:
             w_ai, w_stat, w_day = (w_ai*ai_score)/total_adj, (w_stat*st_score)/total_adj, (w_day*day_score)/total_adj
             backtest_msg = f" (BT-Score: AI {int((1-ai_f/self.test_size)*100)}% | Stat {int((1-st_f/self.test_size)*100)}% | Day {int((1-day_f/self.test_size)*100)}%)"
 
-        cache_key = f"{self.lotto_name}_{self.target_col}_{df_hist['date'].iloc[-1].strftime('%Y-%m-%d')}_ultimate_fs"
+        cache_key = f"{self.lotto_name}_{self.target_col}_{df_hist['date'].iloc[-1].strftime('%Y-%m-%d')}_ultimate_fs_lite"
         if cache_key not in st.session_state.model_cache:
             trained_models = {}
             for name, model in self.models.items():
@@ -841,7 +816,6 @@ if btn_hot:
         
         progress = st.progress(0)
         for i in range(100):
-            time.sleep(0.01)
             progress.progress(i + 1)
         progress.empty()
         
@@ -926,7 +900,6 @@ elif btn_cold:
                 
         progress = st.progress(0)
         for i in range(100):
-            time.sleep(0.01)
             progress.progress(i + 1)
         progress.empty()
         
