@@ -4,7 +4,7 @@ import requests
 # ==========================================
 # 1. ตั้งค่าหน้าเว็บหลัก (ต้องมีแค่ในไฟล์นี้ไฟล์เดียว)
 # ==========================================
-st.set_page_config(page_title="ระบบวิเคราะห์หวย Ultimate V4", page_icon="🚀", layout="centered")
+st.set_page_config(page_title="ระบบวิเคราะห์หวย สูตรคำนวณAi", page_icon="🚀", layout="centered")
 
 # ==========================================
 # 2. กำหนดลิงก์ Raw จาก GitHub
@@ -44,7 +44,7 @@ if mode == "🔴 ค้นหา เลขเด่น (มาแรง)":
         # รันโค้ดไฟล์เลขเด่น
         exec(code, globals())
         
-elif mode == "⚪️ ค้นหา เลขดับ (หลุดแน่นอน)":
+elif mode == "🌑 ค้นหา เลขดับ (หลุดแน่นอน)":
     code = fetch_code(URL_LEKDUB)
     if code:
         # รันโค้ดไฟล์เลขดับ
