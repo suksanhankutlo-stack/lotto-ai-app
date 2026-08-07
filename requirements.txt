@@ -3,9 +3,6 @@ pandas
 numpy
 requests
 beautifulsoup4
-lxml
-matplotlib
-scipy
 scikit-learn
 xgboost
 joblib
