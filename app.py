@@ -1,109 +1,51 @@
-import gradio as gr
+import streamlit as st
+import lotto_lekden
+import lotto_lekdub
 
-# -------------------------
-# เรียก Engine จาก GitHub
-# -------------------------
-# สมมุติว่าโหลด lekden และ lekdub เรียบร้อยแล้ว
+st.set_page_config(
+    page_title="Lotto AI PRO",
+    page_icon="🎯",
+    layout="wide"
+)
 
-LOTTO_LIST = [
-    "หวยไทย",
-    "หวยธกส",
-    "หวยออมสิน",
-    "หวยลาว",
-    "หวยฮานอย",
-    "หวยมาเลย์",
-    "หวยหุ้นไทยเย็น",
-    "หวยหุ้นนิเคอิบ่าย",
-    "หวยหุ้นฮั่งเส็งบ่าย",
-    "หวยหุ้นจีนบ่าย",
-]
+st.title("🎯 Lotto AI PRO V4")
 
-def analyze(lotto, mode):
+lotto = st.selectbox(
+    "เลือกประเภทหวย",
+    [
+        "หวยไทย",
+        "หวยธกส",
+        "หวยออมสิน",
+        "หวยลาว",
+        "หวยฮานอย",
+        "หวยมาเลย์",
+        "หวยหุ้นไทยเย็น",
+        "หวยหุ้นนิเคอิบ่าย",
+        "หวยหุ้นฮั่งเส็งบ่าย",
+        "หวยหุ้นจีนบ่าย",
+    ]
+)
 
-    if mode == "เลขเด่น":
-        result = lekden.analyze_lotto(
-            lotto_name=lotto,
-            target_day=None
-        )
-    else:
-        result = lekdub.analyze_lotto(
-            lotto_name=lotto,
-            target_day=None
-        )
+mode = st.radio(
+    "เลือกระบบ",
+    ["เลขเด่น", "เลขดับ"],
+    horizontal=True
+)
 
-    return str(result)
+if st.button("🚀 วิเคราะห์", use_container_width=True):
 
-css = """
-.gradio-container{
-    max-width:900px!important;
-    margin:auto;
-    background:#111827;
-}
+    with st.spinner("กำลังวิเคราะห์..."):
 
-button{
-    height:55px;
-    font-size:18px!important;
-    border-radius:15px!important;
-}
+        if mode == "เลขเด่น":
+            result = lotto_lekden.analyze_lotto(
+                lotto_name=lotto,
+                target_day=None
+            )
+        else:
+            result = lotto_lekdub.analyze_lotto(
+                lotto_name=lotto,
+                target_day=None
+            )
 
-textarea{
-    font-size:18px!important;
-}
-
-h1{
-    text-align:center;
-}
-
-footer{
-    display:none;
-}
-"""
-
-with gr.Blocks(
-    theme=gr.themes.Soft(
-        primary_hue="red",
-        secondary_hue="blue"
-    ),
-    css=css
-) as demo:
-
-    gr.Markdown(
-        """
-# 🎯 Lotto AI PRO V4
-
-### Ultimate Lottery AI
-เลขเด่น • เลขดับ • AI 4 สำนัก • Markov • Statistics
-"""
-    )
-
-    with gr.Row():
-
-        lotto = gr.Dropdown(
-            choices=LOTTO_LIST,
-            value="หวยไทย",
-            label="🎯 เลือกประเภทหวย"
-        )
-
-        mode = gr.Radio(
-            ["เลขเด่น","เลขดับ"],
-            value="เลขเด่น",
-            label="🧠 ระบบวิเคราะห์"
-        )
-
-    btn = gr.Button(
-        "🚀 วิเคราะห์",
-        variant="primary"
-    )
-
-    output = gr.Textbox(
-        lines=25,
-        label="📊 ผลการวิเคราะห์"
-    )
-
-    btn.click(
-        analyze,
-        [lotto,mode],
-        output
-    )
-
-demo.launch()
+    st.success("วิเคราะห์เสร็จแล้ว")
+    st.write(result)
