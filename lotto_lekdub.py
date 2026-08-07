@@ -1,3 +1,4 @@
+import streamlit as st
 import requests
 import warnings
 from bs4 import BeautifulSoup
@@ -8,105 +9,109 @@ from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, HistGradientBoostingClassifier
 from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder
-from joblib import Memory
 import copy
+
 warnings.filterwarnings('ignore')
 
 # ==============================================================================
-# 0. Setup Caching & Global Variables
+# 0. Setup Streamlit Page & Caching State
 # ==============================================================================
-memory = Memory(location='/tmp/lotto_cache_v4', verbose=0)
-global_model_cache = {}
-global_backtest_cache = {}
+
+st.set_page_config(page_title="ระบบวิเคราะห์เลขดับ PRO V4", page_icon="🛑", layout="centered")
+
+if 'global_model_cache' not in st.session_state:
+    st.session_state.global_model_cache = {}
+if 'global_backtest_cache' not in st.session_state:
+    st.session_state.global_backtest_cache = {}
 
 # ==============================================================================
 # 1. Web Scraper
 # ==============================================================================
-class LotteryScraper:
-    def __init__(self):
-        self.urls = {
-            'หวยไทย': 'https://suksan18190.blogspot.com/2026/07/blog-post_07.html',
-            'หวยธกส': 'https://suksan18190.blogspot.com/2026/07/blog-post_12.html',
-            'หวยออมสิน': 'https://suksan18190.blogspot.com/2026/07/blog-post_525.html',
-            'หวยลาว': 'https://suksan18190.blogspot.com/2026/07/blog-post.html',
-            'หวยฮานอย': 'https://suksan18190.blogspot.com/2026/07/blog-post_08.html',
-            'หวยมาเลย์': 'https://suksan18190.blogspot.com/2026/07/blog-post_10.html',
-            'หวยหุ้นไทยเย็น': 'https://suksan18190.blogspot.com/2026/07/blog-post_11.html',
-            'หวยหุ้นนิเคอิบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_412.html',
-            'หวยหุ้นฮั่งเส็งบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_229.html',
-            'หวยหุ้นจีนบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_162.html'
-        }
 
-    @staticmethod
-    @memory.cache
-    def _fetch_url_content(url):
-        try:
-            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-            return response.content
-        except:
-            return None
+LOTTO_URLS = {
+    'หวยไทย': 'https://suksan18190.blogspot.com/2026/07/blog-post_07.html',
+    'หวยธกส': 'https://suksan18190.blogspot.com/2026/07/blog-post_12.html',
+    'หวยออมสิน': 'https://suksan18190.blogspot.com/2026/07/blog-post_525.html',
+    'หวยลาว': 'https://suksan18190.blogspot.com/2026/07/blog-post.html',
+    'หวยฮานอย': 'https://suksan18190.blogspot.com/2026/07/blog-post_08.html',
+    'หวยมาเลย์': 'https://suksan18190.blogspot.com/2026/07/blog-post_10.html',
+    'หวยหุ้นไทยเย็น': 'https://suksan18190.blogspot.com/2026/07/blog-post_11.html',
+    'หวยหุ้นนิเคอิบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_412.html',
+    'หวยหุ้นฮั่งเส็งบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_229.html',
+    'หวยหุ้นจีนบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_162.html'
+}
 
-    def fetch_data(self, lotto_name):
-        if lotto_name not in self.urls: return None
-        content = self._fetch_url_content(self.urls[lotto_name])
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_data(lotto_name):
+    if lotto_name not in LOTTO_URLS: return None
+    url = LOTTO_URLS[lotto_name]
+    
+    try:
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+        content = response.content
         if not content: return None
 
-        try:
-            soup = BeautifulSoup(content, 'html.parser')
-            post_body = soup.find('div', class_=re.compile(r'post-body|entry-content'))
-            if not post_body: return None
+        soup = BeautifulSoup(content, 'html.parser')
+        post_body = soup.find('div', class_=re.compile(r'post-body|entry-content'))
+        if not post_body: return None
 
-            text_content = post_body.get_text()
-            pattern = r"\*\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\d+)\s*\|\s*(\d{2})"
-            matches = re.findall(pattern, text_content)
+        text_content = post_body.get_text()
+        pattern = r"\*\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\d+)\s*\|\s*(\d{2})"
+        matches = re.findall(pattern, text_content)
 
-            data = []
-            for date_str, prize1, bot2 in matches:
-                p1_str = str(prize1).zfill(3)
-                bot2_str = str(bot2).zfill(2)
-                data.append({
-                    'date': date_str,
-                    'draw_num': prize1,
-                    'hundred': int(p1_str[-3]),
-                    'ten': int(p1_str[-2]),
-                    'unit': int(p1_str[-1]),
-                    'bot_ten': int(bot2_str[0]),
-                    'bot_unit': int(bot2_str[1])
-                })
+        data = []
+        for date_str, prize1, bot2 in matches:
+            p1_str = str(prize1).zfill(3)
+            bot2_str = str(bot2).zfill(2)
+            data.append({
+                'date': date_str,
+                'draw_num': prize1,
+                'hundred': int(p1_str[-3]),
+                'ten': int(p1_str[-2]),
+                'unit': int(p1_str[-1]),
+                'bot_ten': int(bot2_str[0]),
+                'bot_unit': int(bot2_str[1])
+            })
 
-            df = pd.DataFrame(data)
-            df['date'] = pd.to_datetime(df['date'])
-            return df.sort_values('date').reset_index(drop=True)
-        except Exception:
-            return None
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+        return df.sort_values('date').reset_index(drop=True)
+    except Exception:
+        return None
 
 # ==============================================================================
-# 2. Adaptive Feature Engineering
+# 2. Adaptive Feature Engineering (Upgraded with Mod3 & Dynamic Lags/Rolls)
 # ==============================================================================
-@memory.cache
+
+@st.cache_data(show_spinner=False)
 def build_features_adaptive(df, col, lags, rolls):
     df_feat = df.copy()
     n = len(df)
     df_feat['prev_val'] = df_feat[col].shift(1)
 
+    # 1. Base Features
     df_feat['mirror'] = (df_feat['prev_val'] + 5) % 10
     df_feat['is_even'] = (df_feat['prev_val'] % 2 == 0).astype(int)
     df_feat['is_high'] = (df_feat['prev_val'] >= 5).astype(int)
-    df_feat['mod3'] = (df_feat['prev_val'] % 3).fillna(0).astype(int)
+    df_feat['mod3'] = (df_feat['prev_val'] % 3).fillna(0).astype(int) # ⚡ Modulo 3
     df_feat['weekday'] = df_feat['date'].dt.weekday
 
+    # 2. Dynamic Lags
     for lag in lags:
         df_feat[f'lag_{lag}'] = df_feat[col].shift(lag)
 
+    # 3. Repeat Patterns
     if 'lag_1' in df_feat.columns and 'lag_2' in df_feat.columns:
         df_feat['repeat_2'] = (df_feat['lag_1'] == df_feat['lag_2']).astype(int)
         if 'lag_3' in df_feat.columns:
             df_feat['repeat_3'] = ((df_feat['lag_1'] == df_feat['lag_2']) & (df_feat['lag_2'] == df_feat['lag_3'])).astype(int)
 
+    # 4. Dynamic Rolling Stats
     for w in rolls:
         df_feat[f'rolling_mean_{w}'] = df_feat[col].shift(1).rolling(w).mean()
         df_feat[f'rolling_std_{w}'] = df_feat[col].shift(1).rolling(w).std()
 
+    # 5. Adaptive Hot/Cold & Skip
     history = df_feat[col].values
     hc_windows = list(rolls)
     if n >= 500 and 50 not in hc_windows: hc_windows.append(50)
@@ -137,6 +142,7 @@ def build_features_adaptive(df, col, lags, rolls):
 # ==============================================================================
 # 3. Optimized Elimination System (PRO V4 - Fast Mobile Edition)
 # ==============================================================================
+
 class OptimizedEliminationSystemV4:
     def __init__(self, df, target_col, lotto_name):
         self.df = df.copy()
@@ -145,18 +151,22 @@ class OptimizedEliminationSystemV4:
         n = len(self.df)
 
         if n >= 700:
+            self.mode_name = "Mode 4 (700+ งวด) - Super Fast"
             self.trees, self.test_size, self.early_stop = 100, 30, 15
             self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
             self.ai_weights = (1.0, 1.0, 1.0, 1.0)
         elif n >= 400:
+            self.mode_name = "Mode 3 (400-699 งวด) - Super Fast"
             self.trees, self.test_size, self.early_stop = 100, 25, 13
             self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
             self.ai_weights = (1.0, 0.9, 0.8, 1.0)
         elif n >= 200:
+            self.mode_name = "Mode 2 (200-399 งวด) - Super Fast"
             self.trees, self.test_size, self.early_stop = 80, 20, 10
             self.lags, self.rolls = [1, 2, 3, 5, 8], [3, 5, 10, 20]
             self.ai_weights = (1.0, 0.8, 0.6, 0.5)
         else:
+            self.mode_name = "Mode 1 (100-199 งวด) - Super Fast"
             self.trees, self.test_size, self.early_stop = 60, 15, 8
             self.lags, self.rolls = [1, 2, 3, 5], [3, 5, 10]
             self.ai_weights = (1.0, 0.8, 0.5, 0.10)
@@ -184,24 +194,25 @@ class OptimizedEliminationSystemV4:
 
         L1, L2, L3 = seq[-1], seq[-2], seq[-3] if n >= 6 else -1
 
+        # Order 1
         mc1, tot1 = np.zeros(10), 0
         for i in range(1, len(seq)-1):
             if seq[i] == L1:
                 mc1[seq[i+1]] += 1
                 tot1 += 1
         prob_o1 = mc1 / tot1 if tot1 > 0 else np.ones(10)/10.0
-
         if n < 200: return prob_o1
 
+        # Order 2
         mc2, tot2 = np.zeros(10), 0
         for i in range(2, len(seq)-1):
             if seq[i-1] == L2 and seq[i] == L1:
                 mc2[seq[i+1]] += 1
                 tot2 += 1
         prob_o2 = mc2 / tot2 if tot2 > 0 else prob_o1
-
         if n < 500: return (0.6 * prob_o2) + (0.4 * prob_o1)
 
+        # Order 3
         mc3, tot3 = np.zeros(10), 0
         for i in range(3, len(seq)-1):
             if seq[i-2] == L3 and seq[i-1] == L2 and seq[i] == L1:
@@ -223,9 +234,8 @@ class OptimizedEliminationSystemV4:
 
     def run_backtest(self, X_train, y_train, df_hist_cut, test_size):
         cache_key = f"bt_{self.lotto_name}_{self.target_col}_{len(df_hist_cut)}_{test_size}_v4"
-        global global_backtest_cache
-        if cache_key in global_backtest_cache:
-            return global_backtest_cache[cache_key]
+        if cache_key in st.session_state.global_backtest_cache:
+            return st.session_state.global_backtest_cache[cache_key]
 
         bt_train_X = X_train.iloc[:-test_size]
         bt_train_y = y_train.iloc[:-test_size]
@@ -282,11 +292,10 @@ class OptimizedEliminationSystemV4:
             if bt_test_y[i] in dead_5: day_fails += 1
 
         result = (ai_fails, stat_fails, day_fails)
-        global_backtest_cache[cache_key] = result
+        st.session_state.global_backtest_cache[cache_key] = result
         return result
 
     def analyze(self, target_dow):
-        global global_model_cache
         df_work = self.df_feat
         df_hist = self.df
         data_size = len(df_hist)
@@ -304,6 +313,7 @@ class OptimizedEliminationSystemV4:
         elif data_size < 500: w_ai, w_stat, w_day = 0.40, 0.40, 0.20
         else: w_ai, w_stat, w_day = 0.50, 0.35, 0.15
 
+        backtest_msg = ""
         if self.test_size > 0 and data_size > self.test_size + 30:
             ai_f, st_f, day_f = self.run_backtest(train_X, train_y, df_hist_cut, self.test_size)
 
@@ -318,6 +328,8 @@ class OptimizedEliminationSystemV4:
             total_adj = w_ai_adj + w_st_adj + w_day_adj
             w_ai, w_stat, w_day = w_ai_adj/total_adj, w_st_adj/total_adj, w_day_adj/total_adj
 
+            backtest_msg = f"*(BT-Score: AI {int((1-ai_f/self.test_size)*100)}% | Stat {int((1-st_f/self.test_size)*100)}% | Day {int((1-day_f/self.test_size)*100)}%)*"
+
         last_date = df_hist['date'].iloc[-1].strftime('%Y-%m-%d')
         cache_key = f"{self.lotto_name}_{self.target_col}_{last_date}_v4_encoded"
         ai_probs = np.zeros(10)
@@ -325,15 +337,14 @@ class OptimizedEliminationSystemV4:
         le_main = LabelEncoder()
         train_y_encoded = le_main.fit_transform(train_y)
 
-        if cache_key in global_model_cache:
-            trained_models, cached_le = global_model_cache[cache_key]
+        if cache_key in st.session_state.global_model_cache:
+            trained_models, cached_le = st.session_state.global_model_cache[cache_key]
             le_main = cached_le
         else:
             trained_models = {}
             for name, model in self.models.items():
                 model.fit(train_X, train_y_encoded)
-                trained_models[name] = model
-            global_model_cache[cache_key] = (trained_models, le_main)
+            st.session_state.global_model_cache[cache_key] = (trained_models, le_main)
 
         total_ai_weight = sum(self.model_weights_dict.values())
         for name, model in trained_models.items():
@@ -365,8 +376,111 @@ class OptimizedEliminationSystemV4:
 
         return {
             'ai': ai_probs, 'stat': stat_probs, 'day': day_probs,
-            'final': final_probs, 'w_ai': w_ai, 'w_stat': w_stat, 'w_day': w_day
+            'final': final_probs, 'w_ai': w_ai, 'w_stat': w_stat, 'w_day': w_day,
+            'bt_msg': backtest_msg
         }
+
+# ==============================================================================
+# 4. Streamlit UI
+# ==============================================================================
 
 def get_dead_numbers(probs_array, k=7):
     return [(idx, probs_array[idx]) for idx in np.argsort(probs_array)[:k]]
+
+def format_dead_output(dead_list):
+    return " - ".join([str(num) for num, prob in dead_list])
+
+st.title("🛑 ระบบวิเคราะห์เลขดับ - PRO V4")
+st.markdown("**(Candidate Elimination - 7 ดับ) Super Fast Mobile Edition**")
+st.divider()
+
+col1, col2 = st.columns(2)
+with col1:
+    target_lotto = st.selectbox('🎯 เลือกหวย:', list(LOTTO_URLS.keys()), index=0)
+with col2:
+    day_options_dict = {
+        'อัตโนมัติ (คำนวณจากงวดล่าสุด)': None, 'วันจันทร์': 0, 'วันอังคาร': 1,
+        'วันพุธ': 2, 'วันพฤหัสบดี': 3, 'วันศุกร์': 4, 'วันเสาร์': 5, 'วันอาทิตย์': 6
+    }
+    selected_day_label = st.selectbox('📅 ออกวัน:', list(day_options_dict.keys()), index=0)
+    dow_input = day_options_dict[selected_day_label]
+
+if st.button("🛑 ค้นหาเลขดับ PRO V4 (Super Fast)", type="primary", use_container_width=True):
+    with st.spinner("⏳ กำลังดึงข้อมูลและประมวลผล โปรดรอสักครู่..."):
+        df = fetch_data(target_lotto)
+
+        if df is None or df.empty:
+            st.error("❌ ไม่สามารถดึงข้อมูลได้ หรือข้อมูลว่างเปล่า")
+        else:
+            sys_status = OptimizedEliminationSystemV4(df, 'hundred', target_lotto)
+            weights_str = f"RF={sys_status.ai_weights[0]} | ET={sys_status.ai_weights[1]} | HGB={sys_status.ai_weights[2]} | XGB={sys_status.ai_weights[3]}"
+
+            st.info(f"""
+            **⚙️ สเตตัสระบบ [{sys_status.mode_name}]:**
+            - 🌲 Trees = {sys_status.trees} | 🔄 BT = {sys_status.test_size} (Stop: {sys_status.early_stop})
+            - 📊 โครงสร้างข้อมูล: Lags {sys_status.lags} | Rolling {sys_status.rolls} | ฟีเจอร์ Modulo 3: เปิดใช้งาน
+            - 🤖 สัดส่วนโหวต AI (4 สำนัก): {weights_str}
+            - 🚀 ประมวลผลแบบรันตามลำดับ (Sequential Mode)
+            """)
+
+            last_date = df['date'].iloc[-1]
+            if dow_input is not None:
+                days_ahead = dow_input - last_date.dayofweek
+                if days_ahead <= 0: days_ahead += 7
+                target_date = last_date + timedelta(days=days_ahead)
+                target_dow = dow_input
+            else:
+                days_ahead = 7 if len(df) <= 1 else (last_date - df['date'].iloc[-2]).days
+                target_date = last_date + timedelta(days=days_ahead)
+                target_dow = target_date.dayofweek
+
+            dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
+            data_size = len(df)
+
+            st.markdown(f"### 🔮 ผลการวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}ที่ {target_date.strftime('%d/%m/%Y')}")
+            st.caption(f"อ้างอิงข้อมูลย้อนหลัง {data_size} งวด")
+            st.divider()
+
+            positions = {
+                '💯 3 ตัวบน (ร้อย)': 'hundred', '🔟 3 ตัวบน (สิบ)': 'ten', '1️⃣ 3 ตัวบน (หน่วย)': 'unit',
+                '🔽 2 ตัวล่าง (สิบ)': 'bot_ten', '⬇️ 2 ตัวล่าง (หน่วย)': 'bot_unit'
+            }
+
+            store_final_probs = {}
+
+            for pos_th, col_en in positions.items():
+                system = OptimizedEliminationSystemV4(df, col_en, target_lotto)
+                results = system.analyze(target_dow)
+
+                if not results:
+                    st.warning(f"⚠️ ข้อมูลไม่เพียงพอสำหรับ: {pos_th}")
+                    continue
+
+                store_final_probs[col_en] = results['final']
+
+                dead_ai = get_dead_numbers(results['ai'], 7)
+                dead_day = get_dead_numbers(results['day'], 7)
+                dead_stat = get_dead_numbers(results['stat'], 7)
+                dead_final = get_dead_numbers(results['final'], 7)
+
+                w_ai, w_st, w_dy = int(results['w_ai']*100), int(results['w_stat']*100), int(results['w_day']*100)
+
+                with st.expander(f"📌 {pos_th} (น้ำหนัก: AI {w_ai}% | Stat {w_st}% | Day {w_dy}%)", expanded=True):
+                    st.markdown(f"{results['bt_msg']}")
+                    st.markdown(f"- 🤖 **ดับ AI**: `{format_dead_output(dead_ai)}`")
+                    st.markdown(f"- 📅 **ดับกำลังวัน**: `{format_dead_output(dead_day)}`")
+                    st.markdown(f"- 📊 **ดับสถิติ**: `{format_dead_output(dead_stat)}`")
+                    st.success(f"🌟 **ดับสรุปรวม**: `{format_dead_output(dead_final)}`")
+
+            st.divider()
+            st.subheader("🔥 สรุปภาพรวมเลขดับ (ถ่วงน้ำหนักทุกหลัก)")
+            
+            if all(k in store_final_probs for k in ['hundred', 'ten', 'unit']):
+                top_probs = (store_final_probs['hundred'] + store_final_probs['ten'] + store_final_probs['unit']) / 3.0
+                st.markdown(f"🚫 **ดับบนรวม (ร้อย-สิบ-หน่วย)** : `{format_dead_output(get_dead_numbers(top_probs, 7))}`")
+
+            if all(k in store_final_probs for k in ['bot_ten', 'bot_unit']):
+                bot_probs = (store_final_probs['bot_ten'] + store_final_probs['bot_unit']) / 2.0
+                st.markdown(f"🚫 **ดับล่างรวม (สิบ-หน่วย)** : `{format_dead_output(get_dead_numbers(bot_probs, 7))}`")
+
+            st.caption("💡 PRO V4: AI ทั้ง 4 สำนักเปิดใช้งานครบถ้วน และถูกปรับให้รันรวดเร็วบนมือถือ")
