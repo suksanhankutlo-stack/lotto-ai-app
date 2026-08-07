@@ -1,56 +1,109 @@
-import streamlit as st
-import requests
-import os
+import gradio as gr
 
-# ตั้งค่าหน้าเพจหลัก
-st.set_page_config(
-    page_title="Lotto AI - ระบบวิเคราะห์สลาก",
-    page_icon="🎯",
-    layout="wide"
-)
+# -------------------------
+# เรียก Engine จาก GitHub
+# -------------------------
+# สมมุติว่าโหลด lekden และ lekdub เรียบร้อยแล้ว
 
-# กำหนด URL ของไฟล์ต้นฉบับจาก GitHub
-URLS = {
-    "🎯 วิเคราะห์เลขเด่น": "https://raw.githubusercontent.com/suksanhankutlo-stack/lotto-ai-app/refs/heads/main/lotto_lekden.py",
-    "🛑 วิเคราะห์เลขดับ": "https://raw.githubusercontent.com/suksanhankutlo-stack/lotto-ai-app/refs/heads/main/lotto_lekdub.py"
+LOTTO_LIST = [
+    "หวยไทย",
+    "หวยธกส",
+    "หวยออมสิน",
+    "หวยลาว",
+    "หวยฮานอย",
+    "หวยมาเลย์",
+    "หวยหุ้นไทยเย็น",
+    "หวยหุ้นนิเคอิบ่าย",
+    "หวยหุ้นฮั่งเส็งบ่าย",
+    "หวยหุ้นจีนบ่าย",
+]
+
+def analyze(lotto, mode):
+
+    if mode == "เลขเด่น":
+        result = lekden.analyze_lotto(
+            lotto_name=lotto,
+            target_day=None
+        )
+    else:
+        result = lekdub.analyze_lotto(
+            lotto_name=lotto,
+            target_day=None
+        )
+
+    return str(result)
+
+css = """
+.gradio-container{
+    max-width:900px!important;
+    margin:auto;
+    background:#111827;
 }
 
-@st.cache_resource(show_spinner=False, ttl=3600) # อัปเดตแคชทุก 1 ชั่วโมง
-def fetch_code(url):
-    """ฟังก์ชันดึงโค้ดจาก GitHub พร้อมทำ Caching"""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        return f"st.error('ไม่สามารถดึงข้อมูลจาก GitHub ได้: {e}')"
+button{
+    height:55px;
+    font-size:18px!important;
+    border-radius:15px!important;
+}
 
-# ==========================================
-# ส่วน UI แถบเมนูด้านข้าง (Sidebar)
-# ==========================================
-st.sidebar.title("เมนูการวิเคราะห์")
-app_mode = st.sidebar.radio("เลือกระบบการทำงาน:", list(URLS.keys()))
+textarea{
+    font-size:18px!important;
+}
 
-st.sidebar.markdown("---")
-st.sidebar.caption("แอปพลิเคชันจะดึงโค้ดเวอร์ชันล่าสุดจาก GitHub มาประมวลผลโดยอัตโนมัติ")
+h1{
+    text-align:center;
+}
 
-# ==========================================
-# ส่วนประมวลผลและแสดงผล (Main Area)
-# ==========================================
-with st.spinner(f"กำลังโหลดระบบ {app_mode}..."):
-    # 1. ดึงโค้ดจาก URL ที่เลือก
-    script_code = fetch_code(URLS[app_mode])
-    
-    # 2. จำลอง Namespace ใหม่เพื่อป้องกันตัวแปรชนกันระหว่างสคริปต์
-    module_namespace = {
-        '__name__': '__main__',
-        'st': st,
-        'requests': requests,
-        'os': os
-    }
-    
-    # 3. สั่งรันโค้ดที่ดาวน์โหลดมา (Exec)
-    try:
-        exec(script_code, module_namespace)
-    except Exception as e:
-        st.error(f"เกิดข้อผิดพลาดในการรันระบบ {app_mode}: {e}")
+footer{
+    display:none;
+}
+"""
+
+with gr.Blocks(
+    theme=gr.themes.Soft(
+        primary_hue="red",
+        secondary_hue="blue"
+    ),
+    css=css
+) as demo:
+
+    gr.Markdown(
+        """
+# 🎯 Lotto AI PRO V4
+
+### Ultimate Lottery AI
+เลขเด่น • เลขดับ • AI 4 สำนัก • Markov • Statistics
+"""
+    )
+
+    with gr.Row():
+
+        lotto = gr.Dropdown(
+            choices=LOTTO_LIST,
+            value="หวยไทย",
+            label="🎯 เลือกประเภทหวย"
+        )
+
+        mode = gr.Radio(
+            ["เลขเด่น","เลขดับ"],
+            value="เลขเด่น",
+            label="🧠 ระบบวิเคราะห์"
+        )
+
+    btn = gr.Button(
+        "🚀 วิเคราะห์",
+        variant="primary"
+    )
+
+    output = gr.Textbox(
+        lines=25,
+        label="📊 ผลการวิเคราะห์"
+    )
+
+    btn.click(
+        analyze,
+        [lotto,mode],
+        output
+    )
+
+demo.launch()
