@@ -1,8 +1,10 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import re
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import joblib
 from joblib import Memory
@@ -17,9 +19,14 @@ from xgboost import XGBClassifier
 import warnings
 warnings.filterwarnings('ignore')
 
-# สร้างแฟ้มเก็บ Cache
+# ==============================================================================
+# 0. Setup Streamlit Page & Caching State
+# ==============================================================================
+
+st.set_page_config(page_title="ระบบวิเคราะห์เลขเด่น Ultimate Ensemble", page_icon="🚀", layout="centered")
+
 os.makedirs('model_cache', exist_ok=True)
-# ตั้งค่า Memory Cache สำหรับ Data และ Features
+os.makedirs('/tmp/lotto_memory_cache', exist_ok=True)
 memory = Memory(location='/tmp/lotto_memory_cache', verbose=0)
 
 LOTTERY_SOURCES = {
@@ -36,7 +43,7 @@ LOTTERY_SOURCES = {
 }
 
 # ==========================================
-# 1. ระบบจัดการข้อมูล & Feature Engineering (Cached)
+# 1. ระบบจัดการข้อมูล & Feature Engineering
 # ==========================================
 @memory.cache
 def fetch_and_clean_data(url):
@@ -136,7 +143,7 @@ def build_features(df, lags, rolls):
     return df_feat.fillna(-1)
 
 # ==========================================
-# 2. ระบบวิเคราะห์ 5 สำนัก (Stat / Cond / Eq / BT)
+# 2. ระบบวิเคราะห์ 5 สำนัก
 # ==========================================
 class PositionalEquation:
     def analyze(self, df):
@@ -189,9 +196,6 @@ class PatternBacktestSystem:
             for i in range(10): probs[i] = freq.get(i, 0)
         return (probs + 0.01) / (probs + 0.01).sum()
 
-# ==========================================
-# 3. AI System (Custom Weighted Ensemble Mode)
-# ==========================================
 class AISystem:
     def __init__(self, lottery_id, trees, rf_w, et_w, hgb_w, xgb_w):
         self.lottery_id = lottery_id
@@ -214,7 +218,6 @@ class AISystem:
             for old_file in glob.glob(f"{prefix_path}*.joblib"):
                 try: os.remove(old_file)
                 except: pass
-
             model = self.voting
             model.fit(X_train, y_train)
             joblib.dump(model, model_path)
@@ -226,9 +229,6 @@ class AISystem:
         for c, p in zip(model.classes_, probs): res[int(c)] = p
         return res / res.sum()
 
-# ==========================================
-# 4. Ensemble Engine (Sequential & Mini-Backtest)
-# ==========================================
 class EnsembleEngine:
     def __init__(self, df_raw, lottery_name, target_dow=None):
         self.df_raw = df_raw
@@ -238,17 +238,25 @@ class EnsembleEngine:
         n = len(df_raw)
 
         if n >= 700:
-            self.mode_name, self.trees, self.test_size, self.early_stop = "Mode 4 (700+ งวด)", 100, 30, 13
-            self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20], (1.0, 1.0, 1.0, 1.0)
+            self.mode_name = "Mode 4 (700+ งวด) - Super Fast"
+            self.trees, self.test_size, self.early_stop = 100, 30, 13
+            self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
+            self.ai_weights = (1.0, 1.0, 1.0, 1.0)
         elif n >= 400:
-            self.mode_name, self.trees, self.test_size, self.early_stop = "Mode 3 (400-699 งวด)", 100, 25, 13
-            self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20], (1.0, 0.9, 0.8, 1.0)
+            self.mode_name = "Mode 3 (400-699 งวด) - Super Fast"
+            self.trees, self.test_size, self.early_stop = 100, 25, 13
+            self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
+            self.ai_weights = (1.0, 0.9, 0.8, 1.0)
         elif n >= 200:
-            self.mode_name, self.trees, self.test_size, self.early_stop = "Mode 2 (200-399 งวด)", 80, 20, 10
-            self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5, 8], [3, 5, 10, 20], (1.0, 0.8, 0.6, 0.5)
+            self.mode_name = "Mode 2 (200-399 งวด) - Super Fast"
+            self.trees, self.test_size, self.early_stop = 80, 20, 10
+            self.lags, self.rolls = [1, 2, 3, 5, 8], [3, 5, 10, 20]
+            self.ai_weights = (1.0, 0.8, 0.6, 0.5)
         else:
-            self.mode_name, self.trees, self.test_size, self.early_stop = "Mode 1 (100-199 งวด)", 60, 15, 8
-            self.lags, self.rolls, self.ai_weights = [1, 2, 3, 5], [3, 5, 10], (1.0, 0.8, 0.5, 0.10)
+            self.mode_name = "Mode 1 (100-199 งวด) - Super Fast"
+            self.trees, self.test_size, self.early_stop = 60, 15, 8
+            self.lags, self.rolls = [1, 2, 3, 5], [3, 5, 10]
+            self.ai_weights = (1.0, 0.8, 0.5, 0.10)
 
         if n < 100: self.test_size = min(5, max(0, n - 30))
 
@@ -317,7 +325,6 @@ class EnsembleEngine:
 
             total = w_ai + w_fq + w_cal + w_st + w_bt + w_eq
             norm_weights = {'AI': w_ai/total, 'Freq': w_fq/total, 'Cal': w_cal/total, 'ST': w_st/total, 'BT': w_bt/total, 'Eq': w_eq/total}
-
             msg = f"(Backtest {steps_run} งวด: AI {int((ai_hits/steps_run)*100)}% | Freq {int((fq_hits/steps_run)*100)}% | ST {int((st_hits/steps_run)*100)}%)"
 
             joblib.dump((norm_weights, msg), cache_key)
@@ -367,43 +374,91 @@ class EnsembleEngine:
             res = self._process_single_position(pos, df_hist, X_all, next_x, next_date)
             results.append(res)
 
-        predictions = {pos: data for pos, data in results}
-        return predictions, next_date
+        return {pos: data for pos, data in results}, next_date
 
 # ==========================================
-# 5. ฟังก์ชันสำหรับเรียกใช้งาน (Wrapper Function)
+# 3. Streamlit User Interface
 # ==========================================
-def analyze_lottery(lotto_name, target_dow=None):
-    """
-    ฟังก์ชันสำหรับเรียกใช้งานระบบวิเคราะห์เลขเด่น
-    :param lotto_name: ชื่อหวยที่ต้องการ เช่น '1. หวยไทย'
-    :param target_dow: วันที่ออกรางวัล (0=จันทร์, ..., 6=อาทิตย์) หากเป็น None จะคำนวณวันถัดไปให้อัตโนมัติ
-    :return: Dictionary ประกอบด้วย next_date, ข้อมูลแยกหลัก (details) และสรุปบน/ล่าง (summary)
-    """
-    if lotto_name not in LOTTERY_SOURCES:
-        raise ValueError(f"ไม่พบแหล่งข้อมูลสำหรับ: {lotto_name}")
 
-    url = LOTTERY_SOURCES[lotto_name]
-    df_raw = fetch_and_clean_data(url)
-    engine = EnsembleEngine(df_raw, lotto_name, target_dow=target_dow)
-    
-    preds, next_date = engine.predict_all()
-    
-    probs_top = (preds['H']['Probs_For_Graph'] + preds['T']['Probs_For_Graph'] + preds['O']['Probs_For_Graph']) / 3.0
-    probs_bot = (preds['T2']['Probs_For_Graph'] + preds['O2']['Probs_For_Graph']) / 2.0
+st.title("🚀 ระบบวิเคราะห์เลขเด่น Ultimate Ensemble")
+st.markdown("**(Super Fast Mobile Edition)**")
+st.divider()
 
-    def get_top5(probs): 
-        return sorted([(i, probs[i]) for i in range(10)], key=lambda x: x[1], reverse=True)[:5]
-    
-    result = {
-        'next_date': next_date,
-        'details': preds,
-        'summary': {
-            'top_3d': get_top5(probs_top),
-            'bot_2d': get_top5(probs_bot)
-        }
+col1, col2 = st.columns(2)
+with col1:
+    selected_lotto = st.selectbox('🎯 เลือกหวย:', list(LOTTERY_SOURCES.keys()), index=0)
+with col2:
+    day_options = {
+        'อัตโนมัติ (คำนวณจากงวดล่าสุด)': None, 'วันจันทร์': 0, 'วันอังคาร': 1,
+        'วันพุธ': 2, 'วันพฤหัสบดี': 3, 'วันศุกร์': 4, 'วันเสาร์': 5, 'วันอาทิตย์': 6
     }
-    return result
+    selected_day_label = st.selectbox('📅 ออกวัน:', list(day_options.keys()), index=0)
+    target_dow = day_options[selected_day_label]
 
-# ตัวอย่างการเรียกใช้งาน:
-# result = analyze_lottery("1. หวยไทย", target_dow=None)
+if st.button("🚀 วิเคราะห์เลขเด่น V.Max (Sequential)", type="primary", use_container_width=True):
+    with st.spinner("⏳ กำลังดึงข้อมูลและคำนวณโมเดล AI โปรดรอสักครู่..."):
+        url = LOTTERY_SOURCES[selected_lotto]
+        df_raw = fetch_and_clean_data(url)
+        engine = EnsembleEngine(df_raw, selected_lotto, target_dow=target_dow)
+
+        weights_str = f"RF={engine.ai_weights[0]} | ET={engine.ai_weights[1]} | HGB={engine.ai_weights[2]} | XGB={engine.ai_weights[3]}"
+
+        st.info(f"""
+        **⚙️ สเตตัสระบบ [{engine.mode_name}]:**
+        - 🌲 Trees = {engine.trees} | 🔄 BT = {engine.test_size} (Stop: {engine.early_stop})
+        - 📊 โครงสร้างข้อมูล: Lags {engine.lags} | Rolling {engine.rolls} | ฟีเจอร์ Modulo 3: เปิดใช้งาน
+        - 🤖 สัดส่วนโหวต AI (4 สำนัก): {weights_str}
+        """)
+
+        preds, next_date = engine.predict_all()
+        dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
+        labels = {'H': 'หลักร้อย (บน)', 'T': 'หลักสิบ (บน)', 'O': 'หลักหน่วย (บน)', 'T2': 'หลักสิบ (ล่าง)', 'O2': 'หลักหน่วย (ล่าง)'}
+
+        st.markdown(f"### 🔮 ผลการวิเคราะห์ ประจำวัน{dow_names[next_date.dayofweek]}ที่ {next_date.strftime('%d-%m-%Y')}")
+        st.divider()
+
+        for pos in ['H', 'T', 'O', 'T2', 'O2']:
+            nums_ai = ", ".join([str(num) for num, prob in preds[pos]['AI']])
+            nums_day = ", ".join([str(num) for num, prob in preds[pos]['Calendar']])
+            nums_stat = ", ".join([str(num) for num, prob in preds[pos]['Frequency']])
+            nums_final = ", ".join([str(num) for num, prob in preds[pos]['Final']])
+
+            with st.expander(f"📍 ตำแหน่ง: {labels[pos]}", expanded=True):
+                st.caption(f"{preds[pos]['BT_Msg']}")
+                st.markdown(f"- 🤖 **เลขเด่น AI** : `{nums_ai}`")
+                st.markdown(f"- 📅 **เลขเด่น กำลังวัน** : `{nums_day}`")
+                st.markdown(f"- 📊 **เลขเด่น สถิติ** : `{nums_stat}`")
+                st.success(f"🌟 **เด่นสรุปรวม 5 ตัว**: `{nums_final}`")
+
+        # สรุปฟันธง
+        probs_top = (preds['H']['Probs_For_Graph'] + preds['T']['Probs_For_Graph'] + preds['O']['Probs_For_Graph']) / 3
+        probs_bot = (preds['T2']['Probs_For_Graph'] + preds['O2']['Probs_For_Graph']) / 2
+
+        def get_top5(probs): return sorted([(i, probs[i]) for i in range(10)], key=lambda x: x[1], reverse=True)[:5]
+        top5_top = get_top5(probs_top)
+        top5_bot = get_top5(probs_bot)
+
+        st.divider()
+        st.subheader("🔥 สรุปฟันธง เลขเด่นมาแรง")
+        st.markdown(f"🚀 **เด่นบนรวม (ร้อย-สิบ-หน่วย)** : `" + " , ".join([str(x[0]) for x in top5_top]) + "`")
+        st.markdown(f"⬇️ **เด่นล่างรวม (สิบ-หน่วย)** : `" + " , ".join([str(x[0]) for x in top5_bot]) + "`")
+
+        # กราฟแสดงผล
+        st.divider()
+        st.subheader("📊 กราฟความน่าจะเป็นแต่ละหลัก")
+        fig, axes = plt.subplots(2, 3, figsize=(12, 8))
+        axes = axes.flatten()
+        colors_list = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd']
+
+        for idx, pos in enumerate(['H', 'T', 'O', 'T2', 'O2']):
+            ax = axes[idx]
+            top_5_items = preds[pos]['Final']
+            ax.bar([str(x[0]) for x in top_5_items], [x[1]*100 for x in top_5_items], color=colors_list)
+            ax.set_title(labels[pos])
+            ax.set_ylabel('โอกาส (%)')
+
+        if len(axes) > 5:
+            fig.delaxes(axes[5])
+
+        plt.tight_layout()
+        st.pyplot(fig)
