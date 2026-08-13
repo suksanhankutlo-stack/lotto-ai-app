@@ -6,481 +6,1795 @@ import re
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, HistGradientBoostingClassifier
+
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    ExtraTreesClassifier,
+    HistGradientBoostingClassifier
+)
+
 from xgboost import XGBClassifier
-from sklearn.preprocessing import LabelEncoder
-import copy
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # ==============================================================================
-# 0. Setup Streamlit Page & Caching State
+# 🛑 LOTTO AI PRO V4.1
+# CANDIDATE ELIMINATION - 7 DEAD
+#
+# SEQUENTIAL / NO MEMORY
+# ------------------------------------------------------------------------------
+# ✅ RF
+# ✅ ExtraTrees
+# ✅ HistGradientBoosting
+# ✅ XGBoost
+# ✅ Walk-Forward Backtest
+# ✅ Frequency + Skip
+# ✅ Markov
+# ✅ Day-of-Week
+# ✅ Adaptive Lags / Rolling
+# ✅ 7 Dead Numbers
+# ❌ No model cache
+# ❌ No session cache
+# ❌ No joblib cache
+# ❌ No persistent memory
 # ==============================================================================
 
-st.set_page_config(page_title="ระบบวิเคราะห์เลขดับ PRO V4", page_icon="🛑", layout="centered")
-
-if 'global_model_cache' not in st.session_state:
-    st.session_state.global_model_cache = {}
-if 'global_backtest_cache' not in st.session_state:
-    st.session_state.global_backtest_cache = {}
 
 # ==============================================================================
-# 1. Web Scraper
+# 0. STREAMLIT SETUP
+# ==============================================================================
+
+st.set_page_config(
+    page_title="ระบบวิเคราะห์เลขดับ PRO V4.1",
+    page_icon="🛑",
+    layout="centered"
+)
+
+
+# ==============================================================================
+# 1. DATA SOURCE
 # ==============================================================================
 
 LOTTO_URLS = {
-    'หวยไทย': 'https://suksan18190.blogspot.com/2026/07/blog-post_07.html',
-    'หวยธกส': 'https://suksan18190.blogspot.com/2026/07/blog-post_12.html',
-    'หวยออมสิน': 'https://suksan18190.blogspot.com/2026/07/blog-post_525.html',
-    'หวยลาว': 'https://suksan18190.blogspot.com/2026/07/blog-post.html',
-    'หวยฮานอย': 'https://suksan18190.blogspot.com/2026/07/blog-post_08.html',
-    'หวยมาเลย์': 'https://suksan18190.blogspot.com/2026/07/blog-post_10.html',
-    'หวยหุ้นไทยเย็น': 'https://suksan18190.blogspot.com/2026/07/blog-post_11.html',
-    'หวยหุ้นนิเคอิบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_412.html',
-    'หวยหุ้นฮั่งเส็งบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_229.html',
-    'หวยหุ้นจีนบ่าย': 'https://suksan18190.blogspot.com/2026/07/blog-post_162.html'
+    "หวยไทย":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_07.html",
+
+    "หวยธกส":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_12.html",
+
+    "หวยออมสิน":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_525.html",
+
+    "หวยลาว":
+        "https://suksan18190.blogspot.com/2026/07/blog-post.html",
+
+    "หวยฮานอย":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_08.html",
+
+    "หวยมาเลย์":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_10.html",
+
+    "หวยหุ้นไทยเย็น":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_11.html",
+
+    "หวยหุ้นนิเคอิบ่าย":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_412.html",
+
+    "หวยหุ้นฮั่งเส็งบ่าย":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_229.html",
+
+    "หวยหุ้นจีนบ่าย":
+        "https://suksan18190.blogspot.com/2026/07/blog-post_162.html"
 }
 
-@st.cache_data(ttl=3600, show_spinner=False)
+
+# ==============================================================================
+# 2. WEB SCRAPER
+# ==============================================================================
+
 def fetch_data(lotto_name):
-    if lotto_name not in LOTTO_URLS: return None
-    url = LOTTO_URLS[lotto_name]
-    
-    try:
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        content = response.content
-        if not content: return None
 
-        soup = BeautifulSoup(content, 'html.parser')
-        post_body = soup.find('div', class_=re.compile(r'post-body|entry-content'))
-        if not post_body: return None
-
-        text_content = post_body.get_text()
-        pattern = r"\*\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\d+)\s*\|\s*(\d{2})"
-        matches = re.findall(pattern, text_content)
-
-        data = []
-        for date_str, prize1, bot2 in matches:
-            p1_str = str(prize1).zfill(3)
-            bot2_str = str(bot2).zfill(2)
-            data.append({
-                'date': date_str,
-                'draw_num': prize1,
-                'hundred': int(p1_str[-3]),
-                'ten': int(p1_str[-2]),
-                'unit': int(p1_str[-1]),
-                'bot_ten': int(bot2_str[0]),
-                'bot_unit': int(bot2_str[1])
-            })
-
-        df = pd.DataFrame(data)
-        df['date'] = pd.to_datetime(df['date'])
-        return df.sort_values('date').reset_index(drop=True)
-    except Exception:
+    if lotto_name not in LOTTO_URLS:
         return None
 
+    url = LOTTO_URLS[lotto_name]
+
+    try:
+
+        response = requests.get(
+            url,
+            headers={
+                "User-Agent":
+                    "Mozilla/5.0 (Linux; Android 10) "
+                    "AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
+            },
+            timeout=15
+        )
+
+        response.raise_for_status()
+
+        if not response.content:
+            return None
+
+        soup = BeautifulSoup(
+            response.content,
+            "html.parser"
+        )
+
+        post_body = soup.find(
+            "div",
+            class_=re.compile(
+                r"post-body|entry-content|post-content|content"
+            )
+        )
+
+        if post_body is None:
+            post_body = soup
+
+        text_content = post_body.get_text(
+            separator="\n"
+        )
+
+        # ------------------------------------------------------------------
+        # รองรับ
+        # * 2026-08-01 | 123 | 45
+        # ------------------------------------------------------------------
+
+        pattern = re.compile(
+            r"\*\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\d+)\s*\|\s*(\d{2})"
+        )
+
+        matches = pattern.findall(text_content)
+
+        data = []
+
+        for date_str, prize1, bot2 in matches:
+
+            p1 = str(prize1).zfill(3)
+            p2 = str(bot2).zfill(2)
+
+            data.append({
+                "date": date_str,
+                "draw_num": p1,
+
+                "hundred": int(p1[0]),
+                "ten": int(p1[1]),
+                "unit": int(p1[2]),
+
+                "bot_ten": int(p2[0]),
+                "bot_unit": int(p2[1])
+            })
+
+        if len(data) < 30:
+            return None
+
+        df = pd.DataFrame(data)
+
+        df["date"] = pd.to_datetime(
+            df["date"],
+            errors="coerce"
+        )
+
+        df = df.dropna(
+            subset=["date"]
+        )
+
+        # ป้องกันข้อมูลซ้ำ
+        df = df.drop_duplicates(
+            subset=["date"],
+            keep="last"
+        )
+
+        df = df.sort_values(
+            "date"
+        ).reset_index(drop=True)
+
+        return df
+
+    except Exception as e:
+
+        st.error(
+            f"❌ ดึงข้อมูลไม่สำเร็จ: {e}"
+        )
+
+        return None
+
+
 # ==============================================================================
-# 2. Adaptive Feature Engineering (Upgraded with Mod3 & Dynamic Lags/Rolls)
+# 3. ADAPTIVE CONFIG
 # ==============================================================================
 
-@st.cache_data(show_spinner=False)
-def build_features_adaptive(df, col, lags, rolls):
+def get_adaptive_config(n):
+
+    if n >= 700:
+
+        return {
+            "mode": "Mode 4 (700+ งวด)",
+            "trees": 100,
+            "test_size": 30,
+            "early_stop": 15,
+            "lags": [1, 2, 3, 5, 8, 13],
+            "rolls": [3, 5, 10, 20],
+            "rf": 1.0,
+            "et": 1.0,
+            "hgb": 1.0,
+            "xgb": 1.0
+        }
+
+    elif n >= 400:
+
+        return {
+            "mode": "Mode 3 (400-699 งวด)",
+            "trees": 100,
+            "test_size": 25,
+            "early_stop": 13,
+            "lags": [1, 2, 3, 5, 8, 13],
+            "rolls": [3, 5, 10, 20],
+            "rf": 1.0,
+            "et": 0.9,
+            "hgb": 0.8,
+            "xgb": 1.0
+        }
+
+    elif n >= 200:
+
+        return {
+            "mode": "Mode 2 (200-399 งวด)",
+            "trees": 80,
+            "test_size": 20,
+            "early_stop": 10,
+            "lags": [1, 2, 3, 5, 8],
+            "rolls": [3, 5, 10, 20],
+            "rf": 1.0,
+            "et": 0.8,
+            "hgb": 0.6,
+            "xgb": 0.5
+        }
+
+    else:
+
+        return {
+            "mode": "Mode 1 (30-199 งวด)",
+            "trees": 60,
+            "test_size": 15,
+            "early_stop": 8,
+            "lags": [1, 2, 3, 5],
+            "rolls": [3, 5, 10],
+            "rf": 1.0,
+            "et": 0.8,
+            "hgb": 0.5,
+            "xgb": 0.1
+        }
+
+
+# ==============================================================================
+# 4. FEATURE ENGINEERING
+# ==============================================================================
+
+def build_features(df, target_col, lags, rolls):
+
     df_feat = df.copy()
-    n = len(df)
-    df_feat['prev_val'] = df_feat[col].shift(1)
 
-    # 1. Base Features
-    df_feat['mirror'] = (df_feat['prev_val'] + 5) % 10
-    df_feat['is_even'] = (df_feat['prev_val'] % 2 == 0).astype(int)
-    df_feat['is_high'] = (df_feat['prev_val'] >= 5).astype(int)
-    df_feat['mod3'] = (df_feat['prev_val'] % 3).fillna(0).astype(int) # ⚡ Modulo 3
-    df_feat['weekday'] = df_feat['date'].dt.weekday
+    n = len(df_feat)
 
-    # 2. Dynamic Lags
+    # ------------------------------------------------------------------
+    # Previous value
+    # ------------------------------------------------------------------
+
+    df_feat["prev_val"] = (
+        df_feat[target_col].shift(1)
+    )
+
+    prev = df_feat["prev_val"]
+
+    # ------------------------------------------------------------------
+    # Basic features
+    # ------------------------------------------------------------------
+
+    df_feat["mirror"] = (
+        (prev + 5) % 10
+    )
+
+    df_feat["is_even"] = (
+        prev % 2 == 0
+    ).astype(int)
+
+    df_feat["is_high"] = (
+        prev >= 5
+    ).astype(int)
+
+    df_feat["mod3"] = (
+        prev % 3
+    )
+
+    df_feat["weekday"] = (
+        df_feat["date"].dt.weekday
+    )
+
+    df_feat["month"] = (
+        df_feat["date"].dt.month
+    )
+
+    df_feat["day"] = (
+        df_feat["date"].dt.day
+    )
+
+    # ------------------------------------------------------------------
+    # LAGS
+    # ------------------------------------------------------------------
+
     for lag in lags:
-        df_feat[f'lag_{lag}'] = df_feat[col].shift(lag)
 
-    # 3. Repeat Patterns
-    if 'lag_1' in df_feat.columns and 'lag_2' in df_feat.columns:
-        df_feat['repeat_2'] = (df_feat['lag_1'] == df_feat['lag_2']).astype(int)
-        if 'lag_3' in df_feat.columns:
-            df_feat['repeat_3'] = ((df_feat['lag_1'] == df_feat['lag_2']) & (df_feat['lag_2'] == df_feat['lag_3'])).astype(int)
+        df_feat[f"lag_{lag}"] = (
+            df_feat[target_col].shift(lag)
+        )
 
-    # 4. Dynamic Rolling Stats
+    # ------------------------------------------------------------------
+    # Repeat
+    # ------------------------------------------------------------------
+
+    if "lag_1" in df_feat.columns:
+
+        df_feat["repeat_2"] = (
+            df_feat["lag_1"] ==
+            df_feat.get("lag_2", -999)
+        ).astype(int)
+
+    if (
+        "lag_1" in df_feat.columns
+        and "lag_2" in df_feat.columns
+        and "lag_3" in df_feat.columns
+    ):
+
+        df_feat["repeat_3"] = (
+            (df_feat["lag_1"] == df_feat["lag_2"]) &
+            (df_feat["lag_2"] == df_feat["lag_3"])
+        ).astype(int)
+
+    # ------------------------------------------------------------------
+    # Rolling
+    # ------------------------------------------------------------------
+
     for w in rolls:
-        df_feat[f'rolling_mean_{w}'] = df_feat[col].shift(1).rolling(w).mean()
-        df_feat[f'rolling_std_{w}'] = df_feat[col].shift(1).rolling(w).std()
 
-    # 5. Adaptive Hot/Cold & Skip
-    history = df_feat[col].values
-    hc_windows = list(rolls)
-    if n >= 500 and 50 not in hc_windows: hc_windows.append(50)
+        shifted = (
+            df_feat[target_col]
+            .shift(1)
+        )
 
-    stats_cols = {f'{typ}{w}_{d}': np.zeros(n) for typ in ['hot', 'cold'] for w in hc_windows for d in range(10) if not (typ=='cold' and w>=50)}
-    skip_cols = {f'skip_{d}': np.full(n, 100) for d in range(10)}
-    last_seen = {d: -1 for d in range(10)}
+        df_feat[f"rolling_mean_{w}"] = (
+            shifted.rolling(w).mean()
+        )
 
-    for i in range(1, n):
+        df_feat[f"rolling_std_{w}"] = (
+            shifted.rolling(w).std()
+        )
+
+    # ------------------------------------------------------------------
+    # HOT / COLD
+    # ------------------------------------------------------------------
+
+    windows = list(rolls)
+
+    if n >= 500 and 50 not in windows:
+        windows.append(50)
+
+    history = df_feat[target_col].values
+
+    for w in windows:
+
         for d in range(10):
-            skip = i - last_seen[d] if last_seen[d] != -1 else 100
-            skip_cols[f'skip_{d}'][i] = skip
 
-        for w in hc_windows:
-            window_slice = history[max(0, i-w):i]
-            for d in range(10):
-                hot_count = np.sum(window_slice == d)
-                stats_cols[f'hot{w}_{d}'][i] = hot_count
+            hot_values = np.zeros(n)
+            cold_values = np.zeros(n)
+
+            for i in range(n):
+
+                start = max(
+                    0,
+                    i - w
+                )
+
+                window = history[start:i]
+
+                count = np.sum(
+                    window == d
+                )
+
+                hot_values[i] = count
+
                 if w < 50:
-                    stats_cols[f'cold{w}_{d}'][i] = len(window_slice) - hot_count
-        last_seen[history[i]] = i
+                    cold_values[i] = (
+                        len(window) - count
+                    )
 
-    for key, val in skip_cols.items(): df_feat[key] = val
-    for key, val in stats_cols.items(): df_feat[key] = val
+            df_feat[
+                f"hot{w}_{d}"
+            ] = hot_values
+
+            if w < 50:
+
+                df_feat[
+                    f"cold{w}_{d}"
+                ] = cold_values
+
+    # ------------------------------------------------------------------
+    # SKIP
+    # ------------------------------------------------------------------
+
+    for d in range(10):
+
+        skip_values = np.full(
+            n,
+            100.0
+        )
+
+        last_seen = -1
+
+        for i in range(n):
+
+            if last_seen >= 0:
+
+                skip_values[i] = (
+                    i - last_seen
+                )
+
+            if history[i] == d:
+
+                last_seen = i
+
+        df_feat[
+            f"skip_{d}"
+        ] = skip_values
 
     return df_feat.fillna(-1)
 
+
 # ==============================================================================
-# 3. Optimized Elimination System (PRO V4 - Fast Mobile Edition)
+# 5. SYSTEM
 # ==============================================================================
 
 class OptimizedEliminationSystemV4:
-    def __init__(self, df, target_col, lotto_name):
+
+    def __init__(
+        self,
+        df,
+        target_col,
+        lotto_name
+    ):
+
         self.df = df.copy()
+
         self.target_col = target_col
+
         self.lotto_name = lotto_name
-        n = len(self.df)
 
-        if n >= 700:
-            self.mode_name = "Mode 4 (700+ งวด) - Super Fast"
-            self.trees, self.test_size, self.early_stop = 100, 30, 15
-            self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
-            self.ai_weights = (1.0, 1.0, 1.0, 1.0)
-        elif n >= 400:
-            self.mode_name = "Mode 3 (400-699 งวด) - Super Fast"
-            self.trees, self.test_size, self.early_stop = 100, 25, 13
-            self.lags, self.rolls = [1, 2, 3, 5, 8, 13], [3, 5, 10, 20]
-            self.ai_weights = (1.0, 0.9, 0.8, 1.0)
-        elif n >= 200:
-            self.mode_name = "Mode 2 (200-399 งวด) - Super Fast"
-            self.trees, self.test_size, self.early_stop = 80, 20, 10
-            self.lags, self.rolls = [1, 2, 3, 5, 8], [3, 5, 10, 20]
-            self.ai_weights = (1.0, 0.8, 0.6, 0.5)
-        else:
-            self.mode_name = "Mode 1 (100-199 งวด) - Super Fast"
-            self.trees, self.test_size, self.early_stop = 60, 15, 8
-            self.lags, self.rolls = [1, 2, 3, 5], [3, 5, 10]
-            self.ai_weights = (1.0, 0.8, 0.5, 0.10)
+        self.n = len(df)
 
-        if n < 100: self.test_size = min(5, max(0, n - 30))
+        self.cfg = get_adaptive_config(
+            self.n
+        )
 
-        self.models = {
-            'rf': RandomForestClassifier(n_estimators=self.trees, random_state=42, max_depth=5, n_jobs=1),
-            'et': ExtraTreesClassifier(n_estimators=self.trees, random_state=42, max_depth=5, n_jobs=1),
-            'hgb': HistGradientBoostingClassifier(random_state=42, max_iter=50),
-            'xgb': XGBClassifier(n_estimators=50, max_depth=3, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)
-        }
+        self.mode_name = self.cfg["mode"]
 
-        self.model_weights_dict = {
-            'rf': self.ai_weights[0], 'et': self.ai_weights[1],
-            'hgb': self.ai_weights[2], 'xgb': self.ai_weights[3]
-        }
+        self.trees = self.cfg["trees"]
 
-        self.df_feat = build_features_adaptive(self.df, self.target_col, tuple(self.lags), tuple(self.rolls))
+        self.test_size = min(
+            self.cfg["test_size"],
+            max(0, self.n - 30)
+        )
 
-    def precompute_markov_adaptive(self, df_hist):
-        seq = df_hist[self.target_col].values
-        n = len(seq)
-        if n < 5: return np.ones(10)/10.0
+        self.early_stop = self.cfg[
+            "early_stop"
+        ]
 
-        L1, L2, L3 = seq[-1], seq[-2], seq[-3] if n >= 6 else -1
+        self.lags = self.cfg["lags"]
 
-        # Order 1
-        mc1, tot1 = np.zeros(10), 0
-        for i in range(1, len(seq)-1):
-            if seq[i] == L1:
-                mc1[seq[i+1]] += 1
-                tot1 += 1
-        prob_o1 = mc1 / tot1 if tot1 > 0 else np.ones(10)/10.0
-        if n < 200: return prob_o1
+        self.rolls = self.cfg["rolls"]
 
-        # Order 2
-        mc2, tot2 = np.zeros(10), 0
-        for i in range(2, len(seq)-1):
-            if seq[i-1] == L2 and seq[i] == L1:
-                mc2[seq[i+1]] += 1
-                tot2 += 1
-        prob_o2 = mc2 / tot2 if tot2 > 0 else prob_o1
-        if n < 500: return (0.6 * prob_o2) + (0.4 * prob_o1)
+        self.ai_weights = (
+            self.cfg["rf"],
+            self.cfg["et"],
+            self.cfg["hgb"],
+            self.cfg["xgb"]
+        )
 
-        # Order 3
-        mc3, tot3 = np.zeros(10), 0
-        for i in range(3, len(seq)-1):
-            if seq[i-2] == L3 and seq[i-1] == L2 and seq[i] == L1:
-                mc3[seq[i+1]] += 1
-                tot3 += 1
-        prob_o3 = mc3 / tot3 if tot3 > 0 else prob_o2
+        self.models = self.create_models()
 
-        return (0.5 * prob_o3) + (0.3 * prob_o2) + (0.2 * prob_o1)
+    # ------------------------------------------------------------------
+    # Models
+    # ------------------------------------------------------------------
 
-    def calculate_freq_skip(self, df_hist, digit):
-        col = self.target_col
-        freq = (df_hist[col] == digit).sum() / max(len(df_hist), 1)
-        matches = df_hist[df_hist[col] == digit]
-        skip = len(df_hist) - matches.index[-1] - 1 if len(matches) > 0 else 100
-
-        norm_freq = min(freq * 10, 1.0)
-        norm_skip = max(1.0 - (skip / 30), 0.0)
-        return (0.5 * norm_freq) + (0.5 * norm_skip)
-
-    def run_backtest(self, X_train, y_train, df_hist_cut, test_size):
-        cache_key = f"bt_{self.lotto_name}_{self.target_col}_{len(df_hist_cut)}_{test_size}_v4"
-        if cache_key in st.session_state.global_backtest_cache:
-            return st.session_state.global_backtest_cache[cache_key]
-
-        bt_train_X = X_train.iloc[:-test_size]
-        bt_train_y = y_train.iloc[:-test_size]
-        bt_test_X = X_train.iloc[-test_size:]
-        bt_test_y = y_train.iloc[-test_size:].values
-
-        le = LabelEncoder()
-        bt_train_y_encoded = le.fit_transform(bt_train_y)
-
-        ai_fails = 0
-        trained_models = {}
-        for name, model in self.models.items():
-            m = copy.deepcopy(model)
-            m.fit(bt_train_X, bt_train_y_encoded)
-            trained_models[name] = m
-
-        ai_preds = np.zeros((test_size, 10))
-        total_ai_weight = sum(self.model_weights_dict.values())
-
-        for name, m in trained_models.items():
-            preds = m.predict_proba(bt_test_X)
-            full_preds = np.zeros((test_size, 10))
-            for idx, c in enumerate(le.classes_):
-                full_preds[:, int(c)] = preds[:, idx]
-            ai_preds += full_preds * self.model_weights_dict[name]
-
-        ai_preds /= total_ai_weight
-
-        for i in range(test_size):
-            dead_5 = np.argsort(ai_preds[i])[:5]
-            if bt_test_y[i] in dead_5: ai_fails += 1
-
-        stat_fails = 0
-        for i in range(test_size):
-            curr_hist = df_hist_cut.iloc[:-(test_size - i)]
-            mk = self.precompute_markov_adaptive(curr_hist)
-            st_probs = np.zeros(10)
-            for d in range(10):
-                st_probs[d] = (0.5 * self.calculate_freq_skip(curr_hist, d)) + (0.5 * mk[d])
-            dead_5 = np.argsort(st_probs)[:5]
-            if bt_test_y[i] in dead_5: stat_fails += 1
-
-        day_fails = 0
-        for i in range(test_size):
-            curr_hist = df_hist_cut.iloc[:-(test_size - i)]
-            target_dow = df_hist_cut.iloc[-(test_size - i)]['date'].weekday()
-            day_probs = np.zeros(10)
-            day_df = curr_hist[curr_hist['date'].dt.weekday == target_dow]
-            if len(day_df) > 0:
-                counts = day_df[self.target_col].value_counts(normalize=True)
-                for d in range(10): day_probs[d] = counts.get(d, 0.0)
-            else: day_probs = np.ones(10)/10.0
-            dead_5 = np.argsort(day_probs)[:5]
-            if bt_test_y[i] in dead_5: day_fails += 1
-
-        result = (ai_fails, stat_fails, day_fails)
-        st.session_state.global_backtest_cache[cache_key] = result
-        return result
-
-    def analyze(self, target_dow):
-        df_work = self.df_feat
-        df_hist = self.df
-        data_size = len(df_hist)
-        if data_size < 30: return None
-
-        exclude = ['date', 'draw_num', 'hundred', 'ten', 'unit', 'bot_ten', 'bot_unit', self.target_col]
-        feature_cols = [c for c in df_work.columns if c not in exclude]
-
-        X, y = df_work[feature_cols], df_work[self.target_col]
-        train_X, test_X = X.iloc[:-1], X.iloc[-1:]
-        train_y = y.iloc[:-1]
-        df_hist_cut = df_hist.iloc[:-1]
-
-        if data_size < 200: w_ai, w_stat, w_day = 0.30, 0.50, 0.20
-        elif data_size < 500: w_ai, w_stat, w_day = 0.40, 0.40, 0.20
-        else: w_ai, w_stat, w_day = 0.50, 0.35, 0.15
-
-        backtest_msg = ""
-        if self.test_size > 0 and data_size > self.test_size + 30:
-            ai_f, st_f, day_f = self.run_backtest(train_X, train_y, df_hist_cut, self.test_size)
-
-            ai_score = max(0.1, 1.0 - (ai_f / self.test_size))**2
-            st_score = max(0.1, 1.0 - (st_f / self.test_size))**2
-            day_score = max(0.1, 1.0 - (day_f / self.test_size))**2
-
-            w_ai_adj = w_ai * ai_score
-            w_st_adj = w_stat * st_score
-            w_day_adj = w_day * day_score
-
-            total_adj = w_ai_adj + w_st_adj + w_day_adj
-            w_ai, w_stat, w_day = w_ai_adj/total_adj, w_st_adj/total_adj, w_day_adj/total_adj
-
-            backtest_msg = f"*(BT-Score: AI {int((1-ai_f/self.test_size)*100)}% | Stat {int((1-st_f/self.test_size)*100)}% | Day {int((1-day_f/self.test_size)*100)}%)*"
-
-        last_date = df_hist['date'].iloc[-1].strftime('%Y-%m-%d')
-        cache_key = f"{self.lotto_name}_{self.target_col}_{last_date}_v4_encoded"
-        ai_probs = np.zeros(10)
-
-        le_main = LabelEncoder()
-        train_y_encoded = le_main.fit_transform(train_y)
-
-        if cache_key in st.session_state.global_model_cache:
-            trained_models, cached_le = st.session_state.global_model_cache[cache_key]
-            le_main = cached_le
-        else:
-            trained_models = {}
-            for name, model in self.models.items():
-                model.fit(train_X, train_y_encoded)
-            st.session_state.global_model_cache[cache_key] = (trained_models, le_main)
-
-        total_ai_weight = sum(self.model_weights_dict.values())
-        for name, model in trained_models.items():
-            preds = model.predict_proba(test_X)[0]
-            model_probs = np.zeros(10)
-            for idx, c in enumerate(le_main.classes_):
-                model_probs[int(c)] = preds[idx]
-            ai_probs += model_probs * self.model_weights_dict[name]
-
-        ai_probs /= total_ai_weight
-        ai_probs /= (ai_probs.sum() + 1e-9)
-
-        stat_probs = np.zeros(10)
-        markov_scores = self.precompute_markov_adaptive(df_hist_cut)
-        for d in range(10):
-            stat_probs[d] = (0.5 * self.calculate_freq_skip(df_hist_cut, d)) + (0.5 * markov_scores[d])
-        stat_probs /= (stat_probs.sum() + 1e-9)
-
-        day_probs = np.zeros(10)
-        day_df = df_hist_cut[df_hist_cut['date'].dt.weekday == target_dow]
-        if len(day_df) > 0:
-            counts = day_df[self.target_col].value_counts(normalize=True)
-            for d in range(10): day_probs[d] = counts.get(d, 0.0)
-        else:
-            day_probs = np.ones(10)/10.0
-
-        final_probs = (w_ai * ai_probs) + (w_stat * stat_probs) + (w_day * day_probs)
-        final_probs /= (final_probs.sum() + 1e-9)
+    def create_models(self):
 
         return {
-            'ai': ai_probs, 'stat': stat_probs, 'day': day_probs,
-            'final': final_probs, 'w_ai': w_ai, 'w_stat': w_stat, 'w_day': w_day,
-            'bt_msg': backtest_msg
+
+            "rf":
+                RandomForestClassifier(
+                    n_estimators=self.trees,
+                    max_depth=5,
+                    min_samples_leaf=2,
+                    random_state=42,
+                    n_jobs=1
+                ),
+
+            "et":
+                ExtraTreesClassifier(
+                    n_estimators=self.trees,
+                    max_depth=5,
+                    min_samples_leaf=2,
+                    random_state=42,
+                    n_jobs=1
+                ),
+
+            "hgb":
+                HistGradientBoostingClassifier(
+                    max_iter=50,
+                    max_depth=5,
+                    learning_rate=0.08,
+                    random_state=42
+                ),
+
+            "xgb":
+                XGBClassifier(
+                    n_estimators=50,
+                    max_depth=3,
+                    learning_rate=0.08,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    tree_method="hist",
+                    eval_metric="mlogloss",
+                    verbosity=0,
+                    random_state=42,
+                    n_jobs=1
+                )
         }
 
-# ==============================================================================
-# 4. Streamlit UI
-# ==============================================================================
+    # ------------------------------------------------------------------
+    # Probability conversion
+    # ------------------------------------------------------------------
 
-def get_dead_numbers(probs_array, k=7):
-    return [(idx, probs_array[idx]) for idx in np.argsort(probs_array)[:k]]
+    @staticmethod
+    def convert_probs(
+        model,
+        probs
+    ):
 
-def format_dead_output(dead_list):
-    return " - ".join([str(num) for num, prob in dead_list])
+        result = np.zeros(10)
 
-st.title("🛑 ระบบวิเคราะห์เลขดับ - PRO V4")
-st.markdown("**(Candidate Elimination - 7 ดับ) Super Fast Mobile Edition**")
-st.divider()
+        for idx, cls in enumerate(
+            model.classes_
+        ):
 
-col1, col2 = st.columns(2)
-with col1:
-    target_lotto = st.selectbox('🎯 เลือกหวย:', list(LOTTO_URLS.keys()), index=0)
-with col2:
-    day_options_dict = {
-        'อัตโนมัติ (คำนวณจากงวดล่าสุด)': None, 'วันจันทร์': 0, 'วันอังคาร': 1,
-        'วันพุธ': 2, 'วันพฤหัสบดี': 3, 'วันศุกร์': 4, 'วันเสาร์': 5, 'วันอาทิตย์': 6
-    }
-    selected_day_label = st.selectbox('📅 ออกวัน:', list(day_options_dict.keys()), index=0)
-    dow_input = day_options_dict[selected_day_label]
+            try:
 
-if st.button("🛑 ค้นหาเลขดับ PRO V4 (Super Fast)", type="primary", use_container_width=True):
-    with st.spinner("⏳ กำลังดึงข้อมูลและประมวลผล โปรดรอสักครู่..."):
-        df = fetch_data(target_lotto)
+                digit = int(cls)
 
-        if df is None or df.empty:
-            st.error("❌ ไม่สามารถดึงข้อมูลได้ หรือข้อมูลว่างเปล่า")
+                if 0 <= digit <= 9:
+
+                    result[digit] = (
+                        probs[idx]
+                    )
+
+            except:
+                pass
+
+        total = result.sum()
+
+        if total <= 0:
+
+            return np.ones(10) / 10
+
+        return result / total
+
+    # ------------------------------------------------------------------
+    # AI probability
+    # ------------------------------------------------------------------
+
+    def train_ai(
+        self,
+        X_train,
+        y_train,
+        X_predict
+    ):
+
+        # --------------------------------------------------------------
+        # Train fresh EVERY TIME
+        # ไม่มี model cache
+        # --------------------------------------------------------------
+
+        ai_probs = np.zeros(10)
+
+        weights = self.ai_weights
+
+        total_weight = 0.0
+
+        for idx, (
+            name,
+            base_model
+        ) in enumerate(
+            self.models.items()
+        ):
+
+            weight = weights[idx]
+
+            if weight <= 0:
+                continue
+
+            # สร้างโมเดลใหม่ทุกครั้ง
+            model = type(base_model)(
+                **base_model.get_params()
+            )
+
+            try:
+
+                model.fit(
+                    X_train,
+                    y_train
+                )
+
+                probs = model.predict_proba(
+                    X_predict
+                )[0]
+
+                model_probs = (
+                    self.convert_probs(
+                        model,
+                        probs
+                    )
+                )
+
+                ai_probs += (
+                    model_probs * weight
+                )
+
+                total_weight += weight
+
+            except Exception:
+                continue
+
+        if total_weight <= 0:
+
+            return np.ones(10) / 10
+
+        ai_probs /= total_weight
+
+        total = ai_probs.sum()
+
+        if total <= 0:
+
+            return np.ones(10) / 10
+
+        return ai_probs / total
+
+    # ------------------------------------------------------------------
+    # Markov
+    # ------------------------------------------------------------------
+
+    def markov(
+        self,
+        df_hist
+    ):
+
+        seq = (
+            df_hist[self.target_col]
+            .astype(int)
+            .values
+        )
+
+        n = len(seq)
+
+        if n < 5:
+
+            return np.ones(10) / 10
+
+        last1 = seq[-1]
+
+        # --------------------------------------------------------------
+        # Order 1
+        # --------------------------------------------------------------
+
+        p1 = np.zeros(10)
+        total1 = 0
+
+        for i in range(
+            0,
+            n - 1
+        ):
+
+            if seq[i] == last1:
+
+                p1[seq[i + 1]] += 1
+
+                total1 += 1
+
+        if total1 > 0:
+
+            p1 /= total1
+
         else:
-            sys_status = OptimizedEliminationSystemV4(df, 'hundred', target_lotto)
-            weights_str = f"RF={sys_status.ai_weights[0]} | ET={sys_status.ai_weights[1]} | HGB={sys_status.ai_weights[2]} | XGB={sys_status.ai_weights[3]}"
 
-            st.info(f"""
-            **⚙️ สเตตัสระบบ [{sys_status.mode_name}]:**
-            - 🌲 Trees = {sys_status.trees} | 🔄 BT = {sys_status.test_size} (Stop: {sys_status.early_stop})
-            - 📊 โครงสร้างข้อมูล: Lags {sys_status.lags} | Rolling {sys_status.rolls} | ฟีเจอร์ Modulo 3: เปิดใช้งาน
-            - 🤖 สัดส่วนโหวต AI (4 สำนัก): {weights_str}
-            - 🚀 ประมวลผลแบบรันตามลำดับ (Sequential Mode)
-            """)
+            p1[:] = 0.1
 
-            last_date = df['date'].iloc[-1]
-            if dow_input is not None:
-                days_ahead = dow_input - last_date.dayofweek
-                if days_ahead <= 0: days_ahead += 7
-                target_date = last_date + timedelta(days=days_ahead)
-                target_dow = dow_input
+        # --------------------------------------------------------------
+        # Order 2
+        # --------------------------------------------------------------
+
+        if n < 200:
+
+            return p1
+
+        last2 = seq[-2]
+
+        p2 = np.zeros(10)
+        total2 = 0
+
+        for i in range(
+            1,
+            n - 1
+        ):
+
+            if (
+                seq[i - 1] == last2
+                and seq[i] == last1
+            ):
+
+                p2[seq[i + 1]] += 1
+
+                total2 += 1
+
+        if total2 > 0:
+
+            p2 /= total2
+
+        else:
+
+            p2 = p1.copy()
+
+        if n < 500:
+
+            return (
+                0.6 * p2
+                +
+                0.4 * p1
+            )
+
+        # --------------------------------------------------------------
+        # Order 3
+        # --------------------------------------------------------------
+
+        last3 = seq[-3]
+
+        p3 = np.zeros(10)
+        total3 = 0
+
+        for i in range(
+            2,
+            n - 1
+        ):
+
+            if (
+                seq[i - 2] == last3
+                and seq[i - 1] == last2
+                and seq[i] == last1
+            ):
+
+                p3[seq[i + 1]] += 1
+
+                total3 += 1
+
+        if total3 > 0:
+
+            p3 /= total3
+
+        else:
+
+            p3 = p2.copy()
+
+        return (
+            0.5 * p3
+            +
+            0.3 * p2
+            +
+            0.2 * p1
+        )
+
+    # ------------------------------------------------------------------
+    # Frequency + Skip
+    # ------------------------------------------------------------------
+
+    def freq_skip(
+        self,
+        df_hist
+    ):
+
+        result = np.zeros(10)
+
+        series = (
+            df_hist[self.target_col]
+            .astype(int)
+            .values
+        )
+
+        n = len(series)
+
+        for d in range(10):
+
+            count = np.sum(
+                series == d
+            )
+
+            freq = (
+                count /
+                max(n, 1)
+            )
+
+            positions = np.where(
+                series == d
+            )[0]
+
+            if len(positions) > 0:
+
+                skip = (
+                    n -
+                    positions[-1] -
+                    1
+                )
+
             else:
-                days_ahead = 7 if len(df) <= 1 else (last_date - df['date'].iloc[-2]).days
-                target_date = last_date + timedelta(days=days_ahead)
-                target_dow = target_date.dayofweek
 
-            dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
-            data_size = len(df)
+                skip = 100
 
-            st.markdown(f"### 🔮 ผลการวิเคราะห์เลขดับ ประจำวัน{dow_names[target_dow]}ที่ {target_date.strftime('%d/%m/%Y')}")
-            st.caption(f"อ้างอิงข้อมูลย้อนหลัง {data_size} งวด")
-            st.divider()
+            norm_freq = min(
+                freq * 10,
+                1.0
+            )
 
-            positions = {
-                '💯 3 ตัวบน (ร้อย)': 'hundred', '🔟 3 ตัวบน (สิบ)': 'ten', '1️⃣ 3 ตัวบน (หน่วย)': 'unit',
-                '🔽 2 ตัวล่าง (สิบ)': 'bot_ten', '⬇️ 2 ตัวล่าง (หน่วย)': 'bot_unit'
+            norm_skip = max(
+                1.0 -
+                skip / 30.0,
+                0.0
+            )
+
+            result[d] = (
+                0.5 * norm_freq
+                +
+                0.5 * norm_skip
+            )
+
+        total = result.sum()
+
+        if total <= 0:
+
+            return np.ones(10) / 10
+
+        return result / total
+
+    # ------------------------------------------------------------------
+    # Day of week
+    # ------------------------------------------------------------------
+
+    def day_probability(
+        self,
+        df_hist,
+        target_dow
+    ):
+
+        day_df = df_hist[
+            df_hist["date"].dt.weekday
+            == target_dow
+        ]
+
+        if len(day_df) == 0:
+
+            return np.ones(10) / 10
+
+        counts = (
+            day_df[self.target_col]
+            .value_counts(
+                normalize=True
+            )
+        )
+
+        probs = np.zeros(10)
+
+        for d in range(10):
+
+            probs[d] = counts.get(
+                d,
+                0.0
+            )
+
+        total = probs.sum()
+
+        if total <= 0:
+
+            return np.ones(10) / 10
+
+        return probs / total
+
+    # ------------------------------------------------------------------
+    # WALK FORWARD BACKTEST
+    # ------------------------------------------------------------------
+
+    def run_backtest(
+        self,
+        X_all,
+        y_all,
+        df_all
+    ):
+
+        test_size = self.test_size
+
+        if (
+            test_size <= 0
+            or len(X_all)
+            <= test_size + 30
+        ):
+
+            return {
+                "ai": 0.5,
+                "stat": 0.5,
+                "day": 0.5,
+                "steps": 0
             }
 
-            store_final_probs = {}
+        start = (
+            len(X_all)
+            - test_size
+        )
 
-            for pos_th, col_en in positions.items():
-                system = OptimizedEliminationSystemV4(df, col_en, target_lotto)
-                results = system.analyze(target_dow)
+        ai_hits = 0
+        stat_hits = 0
+        day_hits = 0
 
-                if not results:
-                    st.warning(f"⚠️ ข้อมูลไม่เพียงพอสำหรับ: {pos_th}")
-                    continue
+        steps = 0
 
-                store_final_probs[col_en] = results['final']
+        # --------------------------------------------------------------
+        # Strict Walk Forward
+        # --------------------------------------------------------------
 
-                dead_ai = get_dead_numbers(results['ai'], 7)
-                dead_day = get_dead_numbers(results['day'], 7)
-                dead_stat = get_dead_numbers(results['stat'], 7)
-                dead_final = get_dead_numbers(results['final'], 7)
+        for i in range(
+            start,
+            len(X_all)
+        ):
 
-                w_ai, w_st, w_dy = int(results['w_ai']*100), int(results['w_stat']*100), int(results['w_day']*100)
+            X_train = X_all.iloc[:i]
 
-                with st.expander(f"📌 {pos_th} (น้ำหนัก: AI {w_ai}% | Stat {w_st}% | Day {w_dy}%)", expanded=True):
-                    st.markdown(f"{results['bt_msg']}")
-                    st.markdown(f"- 🤖 **ดับ AI**: `{format_dead_output(dead_ai)}`")
-                    st.markdown(f"- 📅 **ดับกำลังวัน**: `{format_dead_output(dead_day)}`")
-                    st.markdown(f"- 📊 **ดับสถิติ**: `{format_dead_output(dead_stat)}`")
-                    st.success(f"🌟 **ดับสรุปรวม**: `{format_dead_output(dead_final)}`")
+            y_train = y_all.iloc[:i]
 
-            st.divider()
-            st.subheader("🔥 สรุปภาพรวมเลขดับ (ถ่วงน้ำหนักทุกหลัก)")
-            
-            if all(k in store_final_probs for k in ['hundred', 'ten', 'unit']):
-                top_probs = (store_final_probs['hundred'] + store_final_probs['ten'] + store_final_probs['unit']) / 3.0
-                st.markdown(f"🚫 **ดับบนรวม (ร้อย-สิบ-หน่วย)** : `{format_dead_output(get_dead_numbers(top_probs, 7))}`")
+            X_test = X_all.iloc[
+                [i]
+            ]
 
-            if all(k in store_final_probs for k in ['bot_ten', 'bot_unit']):
-                bot_probs = (store_final_probs['bot_ten'] + store_final_probs['bot_unit']) / 2.0
-                st.markdown(f"🚫 **ดับล่างรวม (สิบ-หน่วย)** : `{format_dead_output(get_dead_numbers(bot_probs, 7))}`")
+            actual = int(
+                y_all.iloc[i]
+            )
 
-            st.caption("💡 PRO V4: AI ทั้ง 4 สำนักเปิดใช้งานครบถ้วน และถูกปรับให้รันรวดเร็วบนมือถือ")
+            hist = df_all.iloc[
+                :i
+            ].copy()
+
+            if len(hist) < 30:
+                continue
+
+            # AI
+            ai = self.train_ai(
+                X_train,
+                y_train,
+                X_test
+            )
+
+            if actual in np.argsort(
+                ai
+            )[::-1][:5]:
+
+                ai_hits += 1
+
+            # STAT
+            mk = self.markov(
+                hist
+            )
+
+            fs = self.freq_skip(
+                hist
+            )
+
+            stat = (
+                0.5 * mk
+                +
+                0.5 * fs
+            )
+
+            stat /= (
+                stat.sum()
+                + 1e-12
+            )
+
+            if actual in np.argsort(
+                stat
+            )[::-1][:5]:
+
+                stat_hits += 1
+
+            # DAY
+            target_dow = (
+                df_all.iloc[i]["date"]
+                .weekday()
+            )
+
+            day = self.day_probability(
+                hist,
+                target_dow
+            )
+
+            if actual in np.argsort(
+                day
+            )[::-1][:5]:
+
+                day_hits += 1
+
+            steps += 1
+
+            # Mobile speed
+            if steps >= self.early_stop:
+                break
+
+        if steps <= 0:
+
+            return {
+                "ai": 0.5,
+                "stat": 0.5,
+                "day": 0.5,
+                "steps": 0
+            }
+
+        return {
+            "ai":
+                ai_hits / steps,
+
+            "stat":
+                stat_hits / steps,
+
+            "day":
+                day_hits / steps,
+
+            "steps":
+                steps
+        }
+
+    # ------------------------------------------------------------------
+    # MAIN ANALYSIS
+    # ------------------------------------------------------------------
+
+    def analyze(
+        self,
+        target_date,
+        target_dow
+    ):
+
+        if self.n < 30:
+            return None
+
+        # ------------------------------------------------------------------
+        # สำคัญมาก:
+        # สร้าง dummy "งวดถัดไป"
+        #
+        # target ของ dummy ไม่ถูกนำไป train
+        # features ของ dummy ใช้เฉพาะ history ก่อนหน้า
+        # ------------------------------------------------------------------
+
+        dummy = {
+            "date":
+                target_date,
+
+            "draw_num":
+                "000",
+
+            "hundred": 0,
+            "ten": 0,
+            "unit": 0,
+            "bot_ten": 0,
+            "bot_unit": 0
+        }
+
+        df_extended = pd.concat(
+            [
+                self.df,
+                pd.DataFrame([dummy])
+            ],
+            ignore_index=True
+        )
+
+        df_feat = build_features(
+            df_extended,
+            self.target_col,
+            self.lags,
+            self.rolls
+        )
+
+        # ------------------------------------------------------------------
+        # history = ข้อมูลจริงทั้งหมด
+        # ------------------------------------------------------------------
+
+        X_all = df_feat.iloc[
+            :-1
+        ].copy()
+
+        X_next = df_feat.iloc[
+            [-1]
+        ].copy()
+
+        y_all = self.df[
+            self.target_col
+        ].astype(int)
+
+        # ------------------------------------------------------------------
+        # Feature columns
+        # ------------------------------------------------------------------
+
+        exclude = [
+            "date",
+            "draw_num",
+            "hundred",
+            "ten",
+            "unit",
+            "bot_ten",
+            "bot_unit"
+        ]
+
+        feature_cols = [
+            c for c in X_all.columns
+            if c not in exclude
+            and c != self.target_col
+        ]
+
+        X_train = X_all[
+            feature_cols
+        ]
+
+        X_predict = X_next[
+            feature_cols
+        ]
+
+        # ------------------------------------------------------------------
+        # BACKTEST
+        # ------------------------------------------------------------------
+
+        bt = self.run_backtest(
+            X_train,
+            y_all,
+            self.df
+        )
+
+        # ------------------------------------------------------------------
+        # Base weights
+        # ------------------------------------------------------------------
+
+        if self.n < 200:
+
+            w_ai = 0.30
+            w_stat = 0.50
+            w_day = 0.20
+
+        elif self.n < 500:
+
+            w_ai = 0.40
+            w_stat = 0.40
+            w_day = 0.20
+
+        else:
+
+            w_ai = 0.50
+            w_stat = 0.35
+            w_day = 0.15
+
+        # ------------------------------------------------------------------
+        # Adaptive BT weights
+        # ------------------------------------------------------------------
+
+        if bt["steps"] > 0:
+
+            ai_score = max(
+                0.10,
+                bt["ai"]
+            ) ** 2
+
+            stat_score = max(
+                0.10,
+                bt["stat"]
+            ) ** 2
+
+            day_score = max(
+                0.10,
+                bt["day"]
+            ) ** 2
+
+            wa = (
+                w_ai *
+                ai_score
+            )
+
+            ws = (
+                w_stat *
+                stat_score
+            )
+
+            wd = (
+                w_day *
+                day_score
+            )
+
+            total = (
+                wa + ws + wd
+            )
+
+            if total > 0:
+
+                w_ai = wa / total
+                w_stat = ws / total
+                w_day = wd / total
+
+        # ------------------------------------------------------------------
+        # AI
+        # ------------------------------------------------------------------
+
+        ai_probs = self.train_ai(
+            X_train,
+            y_all,
+            X_predict
+        )
+
+        # ------------------------------------------------------------------
+        # STAT
+        # ------------------------------------------------------------------
+
+        markov_probs = self.markov(
+            self.df
+        )
+
+        freq_probs = self.freq_skip(
+            self.df
+        )
+
+        stat_probs = (
+            0.5 * markov_probs
+            +
+            0.5 * freq_probs
+        )
+
+        stat_probs /= (
+            stat_probs.sum()
+            + 1e-12
+        )
+
+        # ------------------------------------------------------------------
+        # DAY
+        # ------------------------------------------------------------------
+
+        day_probs = self.day_probability(
+            self.df,
+            target_dow
+        )
+
+        # ------------------------------------------------------------------
+        # FINAL
+        # ------------------------------------------------------------------
+
+        final_probs = (
+            w_ai * ai_probs
+            +
+            w_stat * stat_probs
+            +
+            w_day * day_probs
+        )
+
+        final_probs /= (
+            final_probs.sum()
+            + 1e-12
+        )
+
+        bt_msg = (
+            f"BT-WalkForward "
+            f"{bt['steps']} งวด | "
+            f"AI {bt['ai']*100:.1f}% | "
+            f"Stat {bt['stat']*100:.1f}% | "
+            f"Day {bt['day']*100:.1f}%"
+        )
+
+        return {
+
+            "ai":
+                ai_probs,
+
+            "stat":
+                stat_probs,
+
+            "day":
+                day_probs,
+
+            "final":
+                final_probs,
+
+            "w_ai":
+                w_ai,
+
+            "w_stat":
+                w_stat,
+
+            "w_day":
+                w_day,
+
+            "bt_msg":
+                bt_msg
+        }
+
+
+# ==============================================================================
+# 6. DEAD NUMBER FUNCTIONS
+# ==============================================================================
+
+def get_dead_numbers(
+    probs,
+    k=7
+):
+
+    idx = np.argsort(
+        probs
+    )[:k]
+
+    return [
+        (
+            int(i),
+            float(probs[i])
+        )
+        for i in idx
+    ]
+
+
+def format_dead_output(
+    dead_list
+):
+
+    return " - ".join(
+        str(num)
+        for num, prob
+        in dead_list
+    )
+
+
+# ==============================================================================
+# 7. UI
+# ==============================================================================
+
+st.title(
+    "🛑 ระบบวิเคราะห์เลขดับ PRO V4.1"
+)
+
+st.markdown(
+    "**Candidate Elimination - 7 ดับ**"
+)
+
+st.caption(
+    "Sequential / No Memory / Walk-Forward"
+)
+
+st.divider()
+
+
+col1, col2 = st.columns(2)
+
+
+with col1:
+
+    target_lotto = st.selectbox(
+        "🎯 เลือกหวย:",
+        list(LOTTO_URLS.keys()),
+        index=0
+    )
+
+
+with col2:
+
+    day_options = {
+
+        "อัตโนมัติ (คำนวณจากงวดล่าสุด)":
+            None,
+
+        "วันจันทร์":
+            0,
+
+        "วันอังคาร":
+            1,
+
+        "วันพุธ":
+            2,
+
+        "วันพฤหัสบดี":
+            3,
+
+        "วันศุกร์":
+            4,
+
+        "วันเสาร์":
+            5,
+
+        "วันอาทิตย์":
+            6
+    }
+
+    selected_day = st.selectbox(
+        "📅 ออกวัน:",
+        list(day_options.keys()),
+        index=0
+    )
+
+    dow_input = day_options[
+        selected_day
+    ]
+
+
+# ==============================================================================
+# ANALYZE BUTTON
+# ==============================================================================
+
+if st.button(
+    "🛑 วิเคราะห์เลขดับ PRO V4.1",
+    type="primary",
+    use_container_width=True
+):
+
+    with st.spinner(
+        "⏳ กำลังดึงข้อมูล + "
+        "สร้างโมเดลใหม่ + "
+        "Walk-Forward..."
+    ):
+
+        # --------------------------------------------------------------
+        # ดึงข้อมูลใหม่ทุกครั้ง
+        # --------------------------------------------------------------
+
+        df = fetch_data(
+            target_lotto
+        )
+
+        if (
+            df is None
+            or df.empty
+        ):
+
+            st.error(
+                "❌ ไม่สามารถดึงข้อมูลได้"
+            )
+
+            st.stop()
+
+        # --------------------------------------------------------------
+        # Target Date
+        # --------------------------------------------------------------
+
+        last_date = df[
+            "date"
+        ].iloc[-1]
+
+        if dow_input is not None:
+
+            days_ahead = (
+                dow_input
+                -
+                last_date.weekday()
+            )
+
+            if days_ahead <= 0:
+                days_ahead += 7
+
+            target_date = (
+                last_date
+                +
+                timedelta(
+                    days=days_ahead
+                )
+            )
+
+            target_dow = dow_input
+
+        else:
+
+            if len(df) >= 2:
+
+                gap = (
+                    df["date"].iloc[-1]
+                    -
+                    df["date"].iloc[-2]
+                ).days
+
+                if gap <= 0:
+                    gap = 7
+
+            else:
+
+                gap = 7
+
+            target_date = (
+                last_date
+                +
+                timedelta(
+                    days=gap
+                )
+            )
+
+            target_dow = (
+                target_date.weekday()
+            )
+
+        # --------------------------------------------------------------
+        # Configuration
+        # --------------------------------------------------------------
+
+        cfg = get_adaptive_config(
+            len(df)
+        )
+
+        st.info(
+            f"""
+**⚙️ ระบบ [{cfg['mode']}]**
+
+- 📊 ข้อมูลย้อนหลัง: **{len(df)} งวด**
+- 🌲 Trees: **{cfg['trees']}**
+- 🔄 Backtest: **{cfg['test_size']} งวด**
+- 🛑 Early Stop: **{cfg['early_stop']}**
+- 🔢 Lags: **{cfg['lags']}**
+- 📈 Rolling: **{cfg['rolls']}**
+- 🤖 RF: **{cfg['rf']}**
+- 🌲 ET: **{cfg['et']}**
+- 🧠 HGB: **{cfg['hgb']}**
+- ⚡ XGB: **{cfg['xgb']}**
+
+### 🔐 โหมดความจำ
+**NO MEMORY / NO MODEL CACHE**
+
+ทุกครั้งที่กดวิเคราะห์:
+1. ดึงข้อมูลใหม่
+2. สร้าง Feature ใหม่
+3. สร้างโมเดลใหม่
+4. Backtest ใหม่
+5. วิเคราะห์งวดถัดไปใหม่
+6. ไม่บันทึกโมเดลไว้ใช้กับงวดต่อไป
+"""
+        )
+
+        dow_names = [
+            "จันทร์",
+            "อังคาร",
+            "พุธ",
+            "พฤหัสบดี",
+            "ศุกร์",
+            "เสาร์",
+            "อาทิตย์"
+        ]
+
+        st.markdown(
+            f"""
+### 🔮 ผลการวิเคราะห์เลขดับ
+
+**งวดเป้าหมาย:**  
+วัน{dow_names[target_dow]}
+ที่ {target_date.strftime('%d/%m/%Y')}
+
+**ข้อมูลอ้างอิง:** {len(df)} งวด
+"""
+        )
+
+        st.divider()
+
+        # ------------------------------------------------------------------
+        # POSITIONS
+        # ------------------------------------------------------------------
+
+        positions = {
+
+            "💯 3 ตัวบน (ร้อย)":
+                "hundred",
+
+            "🔟 3 ตัวบน (สิบ)":
+                "ten",
+
+            "1️⃣ 3 ตัวบน (หน่วย)":
+                "unit",
+
+            "🔽 2 ตัวล่าง (สิบ)":
+                "bot_ten",
+
+            "⬇️ 2 ตัวล่าง (หน่วย)":
+                "bot_unit"
+        }
+
+        store_final_probs = {}
+
+        # ------------------------------------------------------------------
+        # วิเคราะห์ทีละหลัก
+        # ------------------------------------------------------------------
+
+        for position_name, col in positions.items():
+
+            system = OptimizedEliminationSystemV4(
+                df,
+                col,
+                target_lotto
+            )
+
+            result = system.analyze(
+                target_date,
+                target_dow
+            )
+
+            if result is None:
+
+                st.warning(
+                    f"⚠️ ข้อมูลไม่เพียงพอ: "
+                    f"{position_name}"
+                )
+
+                continue
+
+            store_final_probs[col] = (
+                result["final"]
+            )
+
+            dead_ai = get_dead_numbers(
+                result["ai"],
+                7
+            )
+
+            dead_stat = get_dead_numbers(
+                result["stat"],
+                7
+            )
+
+            dead_day = get_dead_numbers(
+                result["day"],
+                7
+            )
+
+            dead_final = get_dead_numbers(
+                result["final"],
+                7
+            )
+
+            w_ai = int(
+                result["w_ai"] * 100
+            )
+
+            w_stat = int(
+                result["w_stat"] * 100
+            )
+
+            w_day = int(
+                result["w_day"] * 100
+            )
+
+            with st.expander(
+                f"📌 {position_name} "
+                f"(AI {w_ai}% | "
+                f"Stat {w_stat}% | "
+                f"Day {w_day}%)",
+                expanded=True
+            ):
+
+                st.caption(
+                    result["bt_msg"]
+                )
+
+                st.markdown(
+                    f"- 🤖 **ดับ AI:** "
+                    f"`{format_dead_output(dead_ai)}`"
+                )
+
+                st.markdown(
+                    f"- 📊 **ดับสถิติ:** "
+                    f"`{format_dead_output(dead_stat)}`"
+                )
+
+                st.markdown(
+                    f"- 📅 **ดับกำลังวัน:** "
+                    f"`{format_dead_output(dead_day)}`"
+                )
+
+                st.success(
+                    f"🌟 **ดับสรุปรวม 7 ตัว:** "
+                    f"`{format_dead_output(dead_final)}`"
+                )
+
+        # ------------------------------------------------------------------
+        # SUMMARY
+        # ------------------------------------------------------------------
+
+        st.divider()
+
+        st.subheader(
+            "🔥 สรุปภาพรวมเลขดับ"
+        )
+
+        if all(
+            x in store_final_probs
+            for x in [
+                "hundred",
+                "ten",
+                "unit"
+            ]
+        ):
+
+            top_probs = (
+                store_final_probs["hundred"]
+                +
+                store_final_probs["ten"]
+                +
+                store_final_probs["unit"]
+            ) / 3.0
+
+            top_probs /= (
+                top_probs.sum()
+                + 1e-12
+            )
+
+            st.markdown(
+                f"""
+🚫 **ดับบนรวม (ร้อย-สิบ-หน่วย):**
+
+`{format_dead_output(
+    get_dead_numbers(
+        top_probs,
+        7
+    )
+)}`
+"""
+            )
+
+        if all(
+            x in store_final_probs
+            for x in [
+                "bot_ten",
+                "bot_unit"
+            ]
+        ):
+
+            bot_probs = (
+                store_final_probs["bot_ten"]
+                +
+                store_final_probs["bot_unit"]
+            ) / 2.0
+
+            bot_probs /= (
+                bot_probs.sum()
+                + 1e-12
+            )
+
+            st.markdown(
+                f"""
+🚫 **ดับล่างรวม (สิบ-หน่วย):**
+
+`{format_dead_output(
+    get_dead_numbers(
+        bot_probs,
+        7
+    )
+)}`
+"""
+            )
+
+        st.divider()
+
+        st.success(
+            """
+🔐 **PRO V4.1 Sequential Mode**
+
+ระบบนี้จะไม่เก็บโมเดลหรือผล Backtest
+ไว้ใช้กับการวิเคราะห์ครั้งถัดไป
+
+การกดวิเคราะห์แต่ละครั้ง =
+**เริ่มคำนวณใหม่จากข้อมูลย้อนหลังทั้งหมด**
+
+และการทำนายงวดถัดไปจะใช้เฉพาะข้อมูล
+ที่เกิดขึ้นก่อนงวดเป้าหมายเท่านั้น
+"""
+    )
