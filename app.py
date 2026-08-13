@@ -2,13 +2,14 @@ import streamlit as st
 import requests
 
 # ============================================================
-# 🚀 ตั้งค่าหน้าเว็บ
+# 🚀 LOTTO AI
 # ============================================================
 
 st.set_page_config(
     page_title="ระบบวิเคราะห์หวย สูตรคำนวณ AI",
     page_icon="🚀",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 # ============================================================
@@ -28,38 +29,6 @@ URL_LEKDUB = (
 )
 
 # ============================================================
-# 📥 โหลดโค้ดจาก GitHub
-# ============================================================
-
-@st.cache_data(ttl=600, show_spinner=False)
-def fetch_code(url):
-
-    try:
-        response = requests.get(
-            url,
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            return response.text
-
-        st.error(
-            f"❌ โหลดระบบไม่สำเร็จ "
-            f"(HTTP {response.status_code})"
-        )
-
-        return None
-
-    except Exception as e:
-
-        st.error(
-            f"❌ ไม่สามารถเชื่อมต่อ GitHub ได้: {e}"
-        )
-
-        return None
-
-
-# ============================================================
 # 🎨 CSS
 # ============================================================
 
@@ -67,58 +36,71 @@ st.markdown("""
 <style>
 
 .block-container {
-    max-width: 760px;
-    padding-top: 25px;
-    padding-bottom: 40px;
+    max-width: 850px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
 }
 
-/* หัวข้อ */
+/* Header */
 .main-title {
     text-align: center;
     font-size: 30px;
     font-weight: 800;
-    line-height: 1.25;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .sub-title {
     text-align: center;
     color: #777;
     font-size: 14px;
-    margin-bottom: 28px;
+    margin-bottom: 25px;
 }
 
-/* กล่องระบบ */
+/* Analysis cards */
+.analysis-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 12px;
+    background: #ffffff;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+}
+
 .card-title {
-    font-size: 21px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 750;
     margin-bottom: 5px;
 }
 
-.card-description {
+.card-desc {
     color: #777;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.5;
-    margin-bottom: 15px;
 }
 
-/* ปุ่ม */
+/* Buttons */
 .stButton > button {
     width: 100%;
     min-height: 52px;
     border-radius: 14px;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 700;
+    border: 1px solid #ddd;
+    transition: all 0.2s ease;
 }
 
-/* เส้น */
-.divider {
+.stButton > button:hover {
+    transform: translateY(-1px);
+    border-color: #999;
+}
+
+/* Divider */
+.soft-divider {
     height: 1px;
     background: #eeeeee;
-    margin: 28px 0;
+    margin: 25px 0;
 }
 
-/* Footer */
 .footer {
     text-align: center;
     color: #999;
@@ -129,152 +111,185 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ============================================================
+# 📥 ดึงโค้ดจาก GitHub
+# ============================================================
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_code(url):
+
+    try:
+
+        response = requests.get(
+            url,
+            timeout=15
+        )
+
+        if response.status_code == 200:
+
+            return response.text
+
+        return None
+
+    except Exception:
+
+        return None
+
+
+# ============================================================
+# ▶️ Execute ระบบ
+# ============================================================
+
+def run_analysis(url, system_name):
+
+    with st.spinner(f"กำลังโหลด {system_name}..."):
+
+        code = fetch_code(url)
+
+    if not code:
+
+        st.error(
+            "❌ ไม่สามารถโหลดระบบจาก GitHub ได้\n\n"
+            "กรุณาตรวจสอบ Internet หรือไฟล์บน GitHub"
+        )
+
+        return
+
+    try:
+
+        # แยก namespace เพื่อไม่ให้ตัวแปรชนกันมากเกินไป
+        namespace = {
+            "__name__": "__main__"
+        }
+
+        exec(code, namespace)
+
+    except Exception as e:
+
+        st.error(
+            f"❌ เกิดข้อผิดพลาดในระบบ {system_name}"
+        )
+
+        st.exception(e)
+
 
 # ============================================================
 # 🏠 HEADER
 # ============================================================
 
 st.markdown(
-    '<div class="main-title">🚀 ระบบวิเคราะห์หวย<br>สูตรคำนวณ AI</div>',
+    '<div class="main-title">🚀 ระบบวิเคราะห์หวย AI</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="sub-title">เลือกระบบที่ต้องการวิเคราะห์</div>',
+    '<div class="sub-title">'
+    'ระบบคำนวณเลขเด่นและเลขดับด้วย AI'
+    '</div>',
     unsafe_allow_html=True
 )
 
-
 # ============================================================
-# 🔴 🌑 ระบบวิเคราะห์
+# 🔴 / 🌑 ANALYSIS
 # ============================================================
 
 col1, col2 = st.columns(2, gap="medium")
 
-
-# ============================================================
+# ------------------------------------------------------------
 # 🔴 เลขเด่น
-# ============================================================
+# ------------------------------------------------------------
 
 with col1:
 
-    with st.container(border=True):
+    st.markdown(
+        """
+        <div class="analysis-card">
+            <div class="card-title">🔴 เลขเด่น</div>
+            <div class="card-desc">
+                วิเคราะห์ตัวเลขที่มีแนวโน้มโดดเด่น
+                จากระบบ AI
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        st.markdown(
-            '<div class="card-title">🔴 เลขเด่น</div>',
-            unsafe_allow_html=True
-        )
+    if st.button(
+        "🔴 วิเคราะห์เลขเด่น",
+        key="btn_lekden",
+        use_container_width=True
+    ):
 
-        st.markdown(
-            '<div class="card-description">'
-            'ค้นหาเลขเด่นที่มีแนวโน้มมาแรง '
-            'ด้วยระบบ AI'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-        btn_lekden = st.button(
-            "🚀 วิเคราะห์เลขเด่น",
-            key="btn_lekden",
-            use_container_width=True
-        )
+        st.session_state["analysis_mode"] = "lekden"
 
 
-# ============================================================
+# ------------------------------------------------------------
 # 🌑 เลขดับ
-# ============================================================
+# ------------------------------------------------------------
 
 with col2:
 
-    with st.container(border=True):
-
-        st.markdown(
-            '<div class="card-title">🌑 เลขดับ</div>',
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            '<div class="card-description">'
-            'ค้นหาเลขดับที่มีแนวโน้มหลุด '
-            'ด้วยระบบ AI'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-        btn_lekdub = st.button(
-            "🌑 วิเคราะห์เลขดับ",
-            key="btn_lekdub",
-            use_container_width=True
-        )
-
-
-# ============================================================
-# 🔴 วิเคราะห์เลขเด่น
-# ============================================================
-
-if btn_lekden:
-
     st.markdown(
-        '<div class="divider"></div>',
+        """
+        <div class="analysis-card">
+            <div class="card-title">🌑 เลขดับ</div>
+            <div class="card-desc">
+                วิเคราะห์ตัวเลขที่มีแนวโน้ม
+                หลุดออกจากผลรางวัล
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True
     )
 
-    with st.spinner("🔄 กำลังโหลดระบบวิเคราะห์เลขเด่น..."):
+    if st.button(
+        "🌑 วิเคราะห์เลขดับ",
+        key="btn_lekdub",
+        use_container_width=True
+    ):
 
-        code = fetch_code(URL_LEKDEN)
-
-    if code:
-
-        try:
-
-            exec(code, globals())
-
-        except Exception as e:
-
-            st.error(
-                "❌ เกิดข้อผิดพลาดในระบบวิเคราะห์เลขเด่น"
-            )
-
-            st.exception(e)
+        st.session_state["analysis_mode"] = "lekdub"
 
 
 # ============================================================
-# 🌑 วิเคราะห์เลขดับ
+# 📊 RUN SELECTED SYSTEM
 # ============================================================
 
-elif btn_lekdub:
+if "analysis_mode" in st.session_state:
 
     st.markdown(
-        '<div class="divider"></div>',
+        '<div class="soft-divider"></div>',
         unsafe_allow_html=True
     )
 
-    with st.spinner("🔄 กำลังโหลดระบบวิเคราะห์เลขดับ..."):
+    mode = st.session_state["analysis_mode"]
 
-        code = fetch_code(URL_LEKDUB)
+    if mode == "lekden":
 
-    if code:
+        run_analysis(
+            URL_LEKDEN,
+            "ระบบวิเคราะห์เลขเด่น"
+        )
 
-        try:
+    elif mode == "lekdub":
 
-            exec(code, globals())
-
-        except Exception as e:
-
-            st.error(
-                "❌ เกิดข้อผิดพลาดในระบบวิเคราะห์เลขดับ"
-            )
-
-            st.exception(e)
+        run_analysis(
+            URL_LEKDUB,
+            "ระบบวิเคราะห์เลขดับ"
+        )
 
 
 # ============================================================
-# Footer
+# FOOTER
 # ============================================================
 
 st.markdown(
-    '<div class="footer">'
-    '🤖 AI Lottery Analysis System'
-    '</div>',
+    """
+    <div class="footer">
+        🤖 AI Lottery Analysis System
+        <br>
+        วิเคราะห์จากข้อมูลที่ระบบกำหนด
+    </div>
+    """,
     unsafe_allow_html=True
-)
+        )
