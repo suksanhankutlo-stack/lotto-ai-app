@@ -1390,7 +1390,7 @@ with col1:
     target_lotto = st.selectbox(
         "🎯 เลือกหวย:",
         list(LOTTO_URLS.keys()),
-        index=0
+        index=0,key="dub_1"
     )
 
 
@@ -1426,7 +1426,7 @@ with col2:
     selected_day = st.selectbox(
         "📅 ออกวัน:",
         list(day_options.keys()),
-        index=0
+        index=0,key="dub_2"
     )
 
     dow_input = day_options[
