@@ -1758,7 +1758,7 @@ with col1:
     selected_lotto = st.selectbox(
         "🎯 เลือกหวย:",
         list(LOTTERY_SOURCES.keys()),
-        index=0
+        index=0,key="den_1"
     )
 
 
@@ -1794,7 +1794,7 @@ with col2:
     selected_day_label = st.selectbox(
         "📅 ออกวัน:",
         list(day_options.keys()),
-        index=0
+        index=0,key="den_2"
     )
 
     target_dow = (
