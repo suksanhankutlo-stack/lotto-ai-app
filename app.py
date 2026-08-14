@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import datetime
 
 # ==========================================
 # 1. ตั้งค่าหน้าเว็บหลัก (ต้องมีแค่ในไฟล์นี้ไฟล์เดียว)
@@ -31,29 +32,41 @@ def fetch_code(url):
 # ==========================================
 # 4. หน้า UI หลัก
 # ==========================================
-# ปรับขนาดตัวหนังสือให้พอดีกับหน้าจอมือถือและจัดกึ่งกลาง
 st.markdown("<h3 style='text-align: center;'>🚀 ระบบวิเคราะห์หวย สูตรคำนวณAi</h3>", unsafe_allow_html=True)
-st.write("") # เว้นบรรทัดเล็กน้อย
+st.write("") 
 
-# สร้าง Session State เพื่อจำว่าผู้ใช้กำลังเลือกโหมดไหนอยู่
 if 'active_mode' not in st.session_state:
     st.session_state.active_mode = None
 
-# --- ส่วนของการเลือกหวยและวันที่ (ย้ายมาไว้ด้านบน) ---
-st.session_state.selected_lotto = st.selectbox(
-    "🎯 เลือกหวย:", 
-    ["1. หวยไทย", "2. หวยลาว", "3. ฮานอย", "4. มาเลย์"]
-)
+# --- ส่วนของการเลือกหวย (เพิ่มรายการให้ครบ) ---
+# สามารถแก้ชื่อ หรือเพิ่มหวยที่ต้องการในบรรทัดเหล่านี้ได้เลยครับ
+lotto_list = [
+    "1. หวยรัฐบาลไทย", 
+    "2. หวยลาวพัฒนา", 
+    "3. หวยฮานอย (ปกติ)", 
+    "4. หวยฮานอย (พิเศษ)", 
+    "5. หวยฮานอย (VIP)", 
+    "6. หวยมาเลย์",
+    "7. หวยออมสิน",
+    "8. หวย ธ.ก.ส.",
+    "9. หวยหุ้นไทย",
+    "10. หวยหุ้นต่างประเทศ"
+]
+st.session_state.selected_lotto = st.selectbox("🎯 เลือกหวย:", lotto_list)
 
-st.session_state.selected_date = st.selectbox(
-    "📅 ออกวัน:", 
-    ["อัตโนมัติ (คำนวณจากงวดล่าสุด)"]
-)
+# --- ส่วนของการเลือกวันที่ (เพิ่มระบบปฏิทิน) ---
+date_option = st.selectbox("📅 ออกวัน:", ["อัตโนมัติ (คำนวณจากงวดล่าสุด)", "ระบุวันที่เอง (เลือกจากปฏิทิน)"])
 
-st.write("") # เว้นบรรทัดเล็กน้อย
+# ถ้าผู้ใช้เลือกระบุวันเอง ให้แสดงปฏิทิน (st.date_input)
+if date_option == "ระบุวันที่เอง (เลือกจากปฏิทิน)":
+    custom_date = st.date_input("เลือกวันที่ต้องการ:")
+    st.session_state.selected_date = custom_date.strftime("%Y-%m-%d") # บันทึกเป็นรูปแบบ ปี-เดือน-วัน
+else:
+    st.session_state.selected_date = "อัตโนมัติ"
 
-# --- ส่วนของปุ่มกดวิเคราะห์ (ย้ายลงมาด้านล่าง และปรับเป็นสีแดงทั้ง 2 ปุ่ม) ---
-# ใช้ type="primary" เพื่อให้ปุ่มเป็นสีแดงตามธีมหลัก
+st.write("") 
+
+# --- ส่วนของปุ่มกดวิเคราะห์ (สีแดงทั้ง 2 ปุ่ม) ---
 if st.button("🔴 วิเคราะห์เลขเด่น (มาแรง)", type="primary", use_container_width=True):
     st.session_state.active_mode = "LEKDEN"
 
@@ -68,11 +81,9 @@ st.divider()
 if st.session_state.active_mode == "LEKDEN":
     code = fetch_code(URL_LEKDEN)
     if code:
-        # รันโค้ดไฟล์เลขเด่น
         exec(code, globals())
 
 elif st.session_state.active_mode == "LEKDUB":
     code = fetch_code(URL_LEKDUB)
     if code:
-        # รันโค้ดไฟล์เลขดับ
         exec(code, globals())
