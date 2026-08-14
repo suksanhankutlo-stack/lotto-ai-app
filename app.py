@@ -31,23 +31,15 @@ def fetch_code(url):
 # ==========================================
 # 4. หน้า UI หลัก
 # ==========================================
-st.title("🚀 ระบบวิเคราะห์หวย สูตรคำนวณAi")
+# ปรับขนาดตัวหนังสือให้พอดีกับหน้าจอมือถือและจัดกึ่งกลาง
+st.markdown("<h3 style='text-align: center;'>🚀 ระบบวิเคราะห์หวย สูตรคำนวณAi</h3>", unsafe_allow_html=True)
+st.write("") # เว้นบรรทัดเล็กน้อย
 
 # สร้าง Session State เพื่อจำว่าผู้ใช้กำลังเลือกโหมดไหนอยู่
 if 'active_mode' not in st.session_state:
     st.session_state.active_mode = None
 
-# --- ส่วนของปุ่มกดวิเคราะห์ ---
-if st.button("🔴 วิเคราะห์เลขเด่น (มาแรง)", type="primary", use_container_width=True):
-    st.session_state.active_mode = "LEKDEN"
-
-if st.button("🌑 วิเคราะห์เลขดับ (หลุดแน่นอน)", use_container_width=True):
-    st.session_state.active_mode = "LEKDUB"
-
-st.write("") # เว้นบรรทัดเล็กน้อย
-
-# --- ส่วนของการเลือกหวยและวันที่ (รวมไว้ในหน้าเดียว) ---
-# เก็บค่าตัวเลือกไว้ใน session_state เพื่อให้ไฟล์ที่ดึงมา (exec) สามารถเรียกไปใช้ได้
+# --- ส่วนของการเลือกหวยและวันที่ (ย้ายมาไว้ด้านบน) ---
 st.session_state.selected_lotto = st.selectbox(
     "🎯 เลือกหวย:", 
     ["1. หวยไทย", "2. หวยลาว", "3. ฮานอย", "4. มาเลย์"]
@@ -57,6 +49,16 @@ st.session_state.selected_date = st.selectbox(
     "📅 ออกวัน:", 
     ["อัตโนมัติ (คำนวณจากงวดล่าสุด)"]
 )
+
+st.write("") # เว้นบรรทัดเล็กน้อย
+
+# --- ส่วนของปุ่มกดวิเคราะห์ (ย้ายลงมาด้านล่าง และปรับเป็นสีแดงทั้ง 2 ปุ่ม) ---
+# ใช้ type="primary" เพื่อให้ปุ่มเป็นสีแดงตามธีมหลัก
+if st.button("🔴 วิเคราะห์เลขเด่น (มาแรง)", type="primary", use_container_width=True):
+    st.session_state.active_mode = "LEKDEN"
+
+if st.button("🌑 วิเคราะห์เลขดับ (หลุดแน่นอน)", type="primary", use_container_width=True):
+    st.session_state.active_mode = "LEKDUB"
 
 st.divider()
 
