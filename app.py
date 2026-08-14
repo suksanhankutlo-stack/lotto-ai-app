@@ -29,30 +29,25 @@ def fetch_code(url):
         return None
 
 # ==========================================
-# 4. จัดการ State เพื่อจำค่าปุ่มที่กด
+# 4. หน้า UI หลัก (เปลี่ยนจาก Radio เป็นปุ่มกดเรียงแนวตั้ง)
 # ==========================================
-# สร้างตัวแปรใน session_state ถ้ายังไม่มี
+st.title("ระบบวิเคราะห์หวย สูตรคำนวณAi")
+
+# สร้าง Session State เพื่อจำว่าผู้ใช้กำลังเลือกโหมดไหนอยู่
 if 'active_mode' not in st.session_state:
     st.session_state.active_mode = None
 
-st.title("🚀 ระบบวิเคราะห์หวย สูตรคำนวณAi")
-st.write("เลือกโหมดที่ต้องการวิเคราะห์:")
+# สร้างปุ่ม 2 ปุ่มเรียงกันในแนวตั้ง และใช้ use_container_width=True เพื่อให้ปุ่มกว้างเต็มหน้าจอ
+if st.button("🔴 วิเคราะห์เลขเด่น (มาแรง)", type="primary", use_container_width=True):
+    st.session_state.active_mode = "LEKDEN"
 
-# สร้าง 2 คอลัมน์เพื่อวางปุ่มคู่กัน (สามารถเอา col ออกได้ถ้าอยากให้อยู่บนล่าง)
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("🔴 ค้นหา เลขเด่น (มาแรง)", use_container_width=True):
-        st.session_state.active_mode = "LEKDEN"
-
-with col2:
-    if st.button("🌑 ค้นหา เลขดับ (หลุดแน่นอน)", use_container_width=True):
-        st.session_state.active_mode = "LEKDUB"
+if st.button("🌑 วิเคราะห์เลขดับ (หลุดแน่นอน)", use_container_width=True):
+    st.session_state.active_mode = "LEKDUB"
 
 st.divider()
 
 # ==========================================
-# 5. ดึงโค้ดมา Execute ตามปุ่มที่กดค้างไว้ใน State
+# 5. ดึงโค้ดมา Execute ตามปุ่มที่กดค้างไว้
 # ==========================================
 if st.session_state.active_mode == "LEKDEN":
     code = fetch_code(URL_LEKDEN)
