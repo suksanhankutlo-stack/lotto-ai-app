@@ -526,4 +526,3 @@ if st.button("🚀 วิเคราะห์เลขเด่น V.Max Sequen
         plt.close(fig)
 
 st.divider()
-st.caption("⚠️ ระบบเป็นการวิเคราะห์เชิงสถิติและ Machine Learning ไม่สามารถรับประกันผลรางวัลได้")
