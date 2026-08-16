@@ -25,10 +25,6 @@ URL_LEKDUB = f"{GITHUB_RAW_URL}lotto_lekdub.py"
 def run_script_from_url(url):
     """ดึงไฟล์ Python จาก GitHub และรันผลลัพธ์แสดงบน Streamlit ทันที"""
     try:
-        # เพิ่ม Spinner ให้ผู้ใช้รู้ว่าระบบกำลังประมวลผล
-        with st.spinner("⏳ ระบบกำลังดึงข้อมูล... กรุณารอซักครู่"):
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
             
             # ใช้ exec() เพื่อประมวลผลโค้ดที่ดึงมา
             exec(response.text, globals())
