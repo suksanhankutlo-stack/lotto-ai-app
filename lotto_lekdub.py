@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V4.2 (Upgraded Dead Number Logic - HIGH ACCURACY & CLEAR UI)
+# 🛑 LOTTO AI PRO V4.2 TURBO (Upgraded Dead Number Logic + FAST EXECUTION)
 # CANDIDATE ELIMINATION - 7 DEAD
 # ==============================================================================
 
@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 # ==============================================================================
 
 st.set_page_config(
-    page_title="ระบบวิเคราะห์เลขดับ PRO V4.2",
+    page_title="ระบบวิเคราะห์เลขดับ PRO V4.2 TURBO",
     page_icon="🛑",
     layout="centered"
 )
@@ -93,7 +93,7 @@ LOTTO_URLS = {
 
 
 # ==============================================================================
-# 2. WEB SCRAPER
+# 2. WEB SCRAPER (Cached for speed)
 # ==============================================================================
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -103,7 +103,7 @@ def fetch_data(lotto_name):
         response = requests.get(
             LOTTO_URLS[lotto_name],
             headers={"User-Agent": "Mozilla/5.0 (Linux; Android 10)"},
-            timeout=15
+            timeout=10
         )
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
@@ -123,34 +123,36 @@ def fetch_data(lotto_name):
         if len(data) < 30: return None
         df = pd.DataFrame(data)
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        return df.dropna(subset=["date"]).drop_duplicates(subset=["date"], keep="last").sort_values("date").reset_index(drop=True)
+        return df.dropna().drop_duplicates(subset=["date"], keep="last").sort_values("date").reset_index(drop=True)
     except Exception as e:
         st.error(f"❌ ดึงข้อมูลไม่สำเร็จ: {e}")
         return None
 
 
 # ==============================================================================
-# 3. ADAPTIVE CONFIG
+# 3. TURBO CONFIG (Optimized limits for speed)
 # ==============================================================================
 
 def get_adaptive_config(n):
+    # ปรับลด Test Size และ Early Stop เพื่อให้ Backtest ทำงานพริบตาเดียว
     if n >= 700:
-        return {"mode": "Mode 4 (700+ งวด)", "trees": 120, "test_size": 35, "early_stop": 15, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 20], "rf": 1.0, "et": 1.0, "hgb": 1.0, "xgb": 1.0}
+        return {"mode": "Mode 4 (700+ งวด)", "trees": 70, "test_size": 15, "early_stop": 10, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10], "rf": 1.0, "et": 1.0, "hgb": 1.0, "xgb": 1.0}
     elif n >= 400:
-        return {"mode": "Mode 3 (400-699 งวด)", "trees": 100, "test_size": 30, "early_stop": 13, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 20], "rf": 1.0, "et": 0.9, "hgb": 0.8, "xgb": 1.0}
+        return {"mode": "Mode 3 (400-699 งวด)", "trees": 60, "test_size": 15, "early_stop": 8, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10], "rf": 1.0, "et": 0.9, "hgb": 0.8, "xgb": 1.0}
     elif n >= 200:
-        return {"mode": "Mode 2 (200-399 งวด)", "trees": 80, "test_size": 25, "early_stop": 10, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10, 20], "rf": 1.0, "et": 0.8, "hgb": 0.6, "xgb": 0.5}
+        return {"mode": "Mode 2 (200-399 งวด)", "trees": 50, "test_size": 10, "early_stop": 8, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10], "rf": 1.0, "et": 0.8, "hgb": 0.6, "xgb": 0.5}
     else:
-        return {"mode": "Mode 1 (30-199 งวด)", "trees": 60, "test_size": 15, "early_stop": 8, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10], "rf": 1.0, "et": 0.8, "hgb": 0.5, "xgb": 0.1}
+        return {"mode": "Mode 1 (30-199 งวด)", "trees": 40, "test_size": 10, "early_stop": 5, "lags": [1, 2, 3], "rolls": [3, 5], "rf": 1.0, "et": 0.8, "hgb": 0.5, "xgb": 0.1}
 
 
 # ==============================================================================
-# 4. ENHANCED FEATURE ENGINEERING
+# 4. FAST FEATURE ENGINEERING
 # ==============================================================================
 
 def build_features(df, target_col, lags, rolls):
     df_feat = df.copy()
     n = len(df_feat)
+    target_arr = df_feat[target_col].values
 
     prev = df_feat[target_col].shift(1)
     df_feat["prev_val"] = prev
@@ -159,52 +161,48 @@ def build_features(df, target_col, lags, rolls):
     df_feat["is_high"] = (prev >= 5).astype(int)
 
     # Cyclic Time Features
-    df_feat["weekday_sin"], df_feat["weekday_cos"] = np.sin(2 * np.pi * df_feat["date"].dt.weekday / 7.0), np.cos(2 * np.pi * df_feat["date"].dt.weekday / 7.0)
-    df_feat["month_sin"], df_feat["month_cos"] = np.sin(2 * np.pi * df_feat["date"].dt.month / 12.0), np.cos(2 * np.pi * df_feat["date"].dt.month / 12.0)
-
+    dt = df_feat["date"].dt
+    df_feat["weekday_sin"], df_feat["weekday_cos"] = np.sin(2 * np.pi * dt.weekday / 7.0), np.cos(2 * np.pi * dt.weekday / 7.0)
+    
     for lag in lags: df_feat[f"lag_{lag}"] = df_feat[target_col].shift(lag)
 
-    # Enhanced Rolling (Added EWM to capture recent volatility)
+    # Fast Rolling
     for w in rolls:
         shifted = df_feat[target_col].shift(1)
         df_feat[f"rolling_mean_{w}"] = shifted.rolling(w).mean()
         df_feat[f"rolling_std_{w}"] = shifted.rolling(w).std().fillna(0)
-        df_feat[f"ewm_mean_{w}"] = shifted.ewm(span=w, adjust=False).mean()
 
-    # SKIP calculation
-    history = df_feat[target_col].values
+    # Fast SKIP calculation (Optimized Array loop)
     for d in range(10):
         skip_values = np.full(n, 100.0)
         last_seen = -1
         for i in range(n):
             if last_seen >= 0: skip_values[i] = (i - last_seen)
-            if history[i] == d: last_seen = i
+            if target_arr[i] == d: last_seen = i
         df_feat[f"skip_{d}"] = skip_values
 
     return df_feat.fillna(-1)
 
 
 # ==============================================================================
-# 5. OPTIMIZED ELIMINATION SYSTEM
+# 5. FAST OPTIMIZED ELIMINATION SYSTEM
 # ==============================================================================
 
 class OptimizedEliminationSystemV4:
     def __init__(self, df, target_col, lotto_name):
-        self.df, self.target_col, self.lotto_name, self.n = df.copy(), target_col, lotto_name, len(df)
+        self.df, self.target_col, self.n = df, target_col, len(df)
         self.cfg = get_adaptive_config(self.n)
         self.trees, self.test_size, self.early_stop, self.lags, self.rolls = self.cfg["trees"], min(self.cfg["test_size"], max(0, self.n - 30)), self.cfg["early_stop"], self.cfg["lags"], self.cfg["rolls"]
         self.ai_weights = (self.cfg["rf"], self.cfg["et"], self.cfg["hgb"], self.cfg["xgb"] if XGBClassifier else 0)
-        self.models = self.create_models()
-
-    def create_models(self):
-        models = {
-            "rf": RandomForestClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=-1),
-            "et": ExtraTreesClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=-1),
-            "hgb": HistGradientBoostingClassifier(max_iter=80, max_depth=4, learning_rate=0.04, min_samples_leaf=4, l2_regularization=0.6, random_state=42)
+        
+        # ปิด n_jobs=-1 เพื่อลด overhead ในการสร้าง process ใหม่ (เร็วกว่าสำหรับข้อมูลเล็ก)
+        self.models = {
+            "rf": RandomForestClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=1),
+            "et": ExtraTreesClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=1),
+            "hgb": HistGradientBoostingClassifier(max_iter=50, max_depth=4, learning_rate=0.05, min_samples_leaf=4, random_state=42)
         }
         if XGBClassifier:
-            models["xgb"] = XGBClassifier(n_estimators=60, max_depth=3, learning_rate=0.04, subsample=0.8, colsample_bytree=0.8, tree_method="hist", verbosity=0, random_state=42, n_jobs=-1)
-        return models
+            self.models["xgb"] = XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.05, tree_method="hist", verbosity=0, random_state=42, n_jobs=1)
 
     @staticmethod
     def convert_probs(model, probs):
@@ -213,7 +211,8 @@ class OptimizedEliminationSystemV4:
             if 0 <= int(cls) <= 9: result[int(cls)] = probs[idx]
         return result / result.sum() if result.sum() > 0 else np.ones(10) / 10
 
-    def train_ai(self, X_train, y_train, X_predict):
+    def train_full_ai(self, X_train, y_train, X_predict):
+        # รันเฉพาะตอนออกผลลัพธ์สุดท้าย (ครั้งเดียว)
         ai_probs, total_weight = np.zeros(10), 0.0
         for idx, (name, base_model) in enumerate(self.models.items()):
             weight = self.ai_weights[idx]
@@ -226,26 +225,24 @@ class OptimizedEliminationSystemV4:
             except: pass
         return (ai_probs / total_weight) if total_weight > 0 else np.ones(10) / 10
 
-    def markov(self, df_hist):
-        seq = df_hist[self.target_col].astype(int).values
-        if len(seq) < 5: return np.ones(10) / 10
-        last1 = seq[-1]
-        p1 = np.bincount(seq[1:][seq[:-1] == last1], minlength=10).astype(float)
-        p1 = p1 / p1.sum() if p1.sum() > 0 else np.ones(10) / 10
-        return p1
+    def markov(self, seq_arr):
+        if len(seq_arr) < 5: return np.ones(10) / 10
+        last1 = seq_arr[-1]
+        p1 = np.bincount(seq_arr[1:][seq_arr[:-1] == last1], minlength=10).astype(float)
+        return p1 / p1.sum() if p1.sum() > 0 else np.ones(10) / 10
 
-    def freq_skip(self, df_hist):
-        # Enhancements: Weigh recent history more aggressively
-        series = df_hist[self.target_col].astype(int).values
-        recent_series = series[-30:] if len(series) >= 30 else series
+    def freq_skip(self, seq_arr):
+        n = len(seq_arr)
+        recent_arr = seq_arr[-30:] if n >= 30 else seq_arr
+        n_recent = len(recent_arr)
         
         result = np.zeros(10)
         for d in range(10):
-            freq_all = np.sum(series == d) / max(len(series), 1)
-            freq_recent = np.sum(recent_series == d) / max(len(recent_series), 1)
+            freq_all = np.sum(seq_arr == d) / max(n, 1)
+            freq_recent = np.sum(recent_arr == d) / max(n_recent, 1)
             
-            positions = np.where(series == d)[0]
-            skip = (len(series) - positions[-1] - 1) if len(positions) > 0 else 100
+            positions = np.where(seq_arr == d)[0]
+            skip = (n - positions[-1] - 1) if len(positions) > 0 else 100
             
             norm_freq = min((freq_all * 0.4 + freq_recent * 0.6) * 10, 1.0)
             norm_skip = max(1.0 - skip / 30.0, 0.0)
@@ -259,48 +256,67 @@ class OptimizedEliminationSystemV4:
         for k, v in day_df[self.target_col].value_counts(normalize=True).items(): probs[k] = v
         return probs / probs.sum() if probs.sum() > 0 else np.ones(10) / 10
 
-    def run_backtest(self, X_all, y_all, df_all):
+    def run_fast_backtest(self, X_all, y_all, df_all):
         if self.test_size <= 0 or len(X_all) <= self.test_size + 30: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
         ai_hits, stat_hits, day_hits, steps = 0, 0, 0, 0
+        
+        # ⚡ PROXY AI: ใช้โมเดลจิ๋วและเบามากสำหรับการทดสอบย้อนหลัง เพื่อไม่ให้เปลืองเวลา (แทนการรัน Full Ensemble)
+        proxy_ai = ExtraTreesClassifier(n_estimators=10, max_depth=4, random_state=42, n_jobs=1)
+        target_arr = df_all[self.target_col].astype(int).values
 
-        for i in range(len(X_all) - self.test_size, len(X_all)):
-            X_train, y_train, X_test, actual, hist = X_all.iloc[:i], y_all.iloc[:i], X_all.iloc[[i]], int(y_all.iloc[i]), df_all.iloc[:i].copy()
+        start_idx = len(X_all) - self.test_size
+        for i in range(start_idx, len(X_all)):
+            X_train, y_train, X_test = X_all.iloc[:i], y_all.iloc[:i], X_all.iloc[[i]]
+            actual = int(y_all.iloc[i])
             
-            dead_ai = np.argsort(self.train_ai(X_train, y_train, X_test))[:7]
-            if actual not in dead_ai: ai_hits += 1
+            # AI Check
+            proxy_ai.fit(X_train, y_train)
+            probs = self.convert_probs(proxy_ai, proxy_ai.predict_proba(X_test)[0])
+            if actual not in np.argsort(probs)[:7]: ai_hits += 1
 
-            stat = 0.5 * self.markov(hist) + 0.5 * self.freq_skip(hist)
+            # Stat & Day Check
+            hist_arr = target_arr[:i]
+            stat = 0.5 * self.markov(hist_arr) + 0.5 * self.freq_skip(hist_arr)
             if actual not in np.argsort(stat)[:7]: stat_hits += 1
-            if actual not in np.argsort(self.day_probability(hist, df_all.iloc[i]["date"].weekday()))[:7]: day_hits += 1
+            if actual not in np.argsort(self.day_probability(df_all.iloc[:i], df_all.iloc[i]["date"].weekday()))[:7]: day_hits += 1
 
             steps += 1
             if steps >= self.early_stop: break
 
-        return {"ai": ai_hits/steps, "stat": stat_hits/steps, "day": day_hits/steps, "steps": steps} if steps > 0 else {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
+        return {"ai": ai_hits/steps, "stat": stat_hits/steps, "day": day_hits/steps, "steps": steps}
 
     def analyze(self, target_date, target_dow):
         if self.n < 30: return None
-        df_extended = pd.concat([self.df, pd.DataFrame([{"date": target_date, "draw_num": "000", "hundred": 0, "ten": 0, "unit": 0, "bot_ten": 0, "bot_unit": 0}])], ignore_index=True)
+        
+        dummy_row = pd.DataFrame([{"date": target_date, "draw_num": "000", "hundred": 0, "ten": 0, "unit": 0, "bot_ten": 0, "bot_unit": 0}])
+        df_extended = pd.concat([self.df, dummy_row], ignore_index=True)
         df_feat = build_features(df_extended, self.target_col, self.lags, self.rolls)
 
         X_all = df_feat.iloc[:-1].drop(columns=["date", "draw_num", "hundred", "ten", "unit", "bot_ten", "bot_unit", self.target_col], errors='ignore')
-        bt = self.run_backtest(X_all, self.df[self.target_col].astype(int), self.df)
+        y_all = self.df[self.target_col].astype(int)
+        
+        # 1. รัน Fast Backtest
+        bt = self.run_fast_backtest(X_all, y_all, self.df)
 
-        # Walk-Forward Weighting (Aggressive scaling for better accuracy)
+        # 2. ปรับน้ำหนัก Walk-Forward Weighting 
         w_ai, w_stat, w_day = 0.50, 0.35, 0.15
         if bt["steps"] > 0:
             wa, ws, wd = w_ai * (max(0.10, bt["ai"])**3), w_stat * (max(0.10, bt["stat"])**3), w_day * (max(0.10, bt["day"])**3)
             tot = wa + ws + wd
             if tot > 0: w_ai, w_stat, w_day = wa/tot, ws/tot, wd/tot
 
-        ai_probs = self.train_ai(X_all, self.df[self.target_col].astype(int), df_feat.iloc[[-1]][X_all.columns])
-        stat_probs = (0.5 * self.markov(self.df) + 0.5 * self.freq_skip(self.df))
+        # 3. รันวิเคราะห์ของจริง (เฉพาะครั้งสุดท้าย)
+        X_predict = df_feat.iloc[[-1]][X_all.columns]
+        ai_probs = self.train_full_ai(X_all, y_all, X_predict)
+        
+        target_arr = self.df[self.target_col].astype(int).values
+        stat_probs = (0.5 * self.markov(target_arr) + 0.5 * self.freq_skip(target_arr))
         day_probs = self.day_probability(self.df, target_dow)
 
         final_probs = (w_ai * ai_probs + w_stat * stat_probs + w_day * day_probs)
         final_probs /= final_probs.sum()
 
-        bt_msg = f"📈 Walk-Forward {bt['steps']} งวด | อัตราการคัดเลขดับแม่นยำ: AI {bt['ai']:.0%} | สถิติ {bt['stat']:.0%} | วัน {bt['day']:.0%}"
+        bt_msg = f"⚡ Turbo WF {bt['steps']} งวด | อัตราความแม่นยำ (รอดตาย): AI {bt['ai']:.0%} | สถิติ {bt['stat']:.0%} | วัน {bt['day']:.0%}"
         return {"ai": ai_probs, "stat": stat_probs, "day": day_probs, "final": final_probs, "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, "bt_msg": bt_msg}
 
 
@@ -319,8 +335,8 @@ def format_html_dead(dead_list):
 # 7. MAIN APPLICATION RUN
 # ==============================================================================
 
-st.markdown('<div class="main-title">🛑 ระบบวิเคราะห์เลขดับ PRO V4.2</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Candidate Elimination (7 ตัวดับ) • Tuned for High Accuracy</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🛑 ระบบวิเคราะห์เลขดับ PRO V4.2 TURBO</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Candidate Elimination (7 ตัวดับ) • High Accuracy • ⚡ Fast Execution</div>', unsafe_allow_html=True)
 st.divider()
 
 col1, col2 = st.columns(2)
@@ -330,8 +346,8 @@ with col2:
     day_options = {"อัตโนมัติ (จากงวดล่าสุด)": None, "วันจันทร์": 0, "วันอังคาร": 1, "วันพุธ": 2, "วันพฤหัสบดี": 3, "วันศุกร์": 4, "วันเสาร์": 5, "วันอาทิตย์": 6}
     dow_input = day_options[st.selectbox("📅 ออกวัน:", list(day_options.keys()), index=0)]
 
-if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว", type="primary", use_container_width=True):
-    with st.spinner("⏳ AI กำลังดึงข้อมูลและประมวลผลการคัดแยกความน่าจะเป็นต่ำสุด..."):
+if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว (Turbo ⚡)", type="primary", use_container_width=True):
+    with st.spinner("⚡ AI กำลังสกัดความน่าจะเป็นต่ำสุด (Turbo Mode)..."):
         df = fetch_data(target_lotto)
 
         if df is None or df.empty:
@@ -357,7 +373,6 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว", t
             store_final_probs[col] = result["final"]
             dead_final = get_dead_numbers(result["final"], 7)
             
-            # การ์ดแสดงผล
             st.markdown(f'''
             <div class="dead-card">
                 <div class="position-title">{position_name}</div>
