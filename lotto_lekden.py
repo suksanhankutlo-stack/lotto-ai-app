@@ -524,4 +524,4 @@ if st.button("🚀 วิเคราะห์เลขเด่น V.Max Sequen
         plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
-st.divider()
+        
