@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V7.0 NEURAL SINGULARITY
+# 🛑 LOTTO AI PRO V7.0 NEURAL SINGULARITY (PREMIUM UI)
 # CONSENSUS VARIANCE PENALTY • MTBO Z-SCORE • EXPONENTIAL WF
 # CANDIDATE ELIMINATION TOP-7
 # ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION
@@ -22,6 +22,7 @@ from sklearn.ensemble import (
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
+from sklearn.base import clone
 
 warnings.filterwarnings("ignore")
 
@@ -53,56 +54,6 @@ st.markdown("""
     font-size:14px;
     margin-bottom:20px;
     font-weight: bold;
-}
-.dead-card {
-    background:linear-gradient(135deg, #ffffff, #fafafa);
-    border-left:7px solid #111;
-    padding:20px;
-    border-radius:12px;
-    margin-bottom:18px;
-    box-shadow:0 6px 15px rgba(0,0,0,.08);
-}
-.position-title {
-    font-size:20px;
-    font-weight:900;
-    color:#222;
-    border-bottom:2px solid #ddd;
-    padding-bottom:7px;
-    margin-bottom:12px;
-}
-.dead-number-highlight {
-    font-size:34px;
-    font-weight:900;
-    color:#B71C1C;
-    letter-spacing:6px;
-    text-align:center;
-    margin:15px 0;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-}
-.info-row {
-    margin:8px 0;
-    font-size:14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.badge {
-    padding:5px 12px;
-    border-radius:20px;
-    font-size:14px;
-    font-weight:800;
-    letter-spacing: 2px;
-}
-.badge-ai { background:#E3F2FD; color:#1565C0; }
-.badge-stat { background:#E8F5E9; color:#2E7D32; }
-.badge-day { background:#FFF3E0; color:#E65100; }
-.metric-box {
-    font-size: 12px;
-    color: #666;
-    background: #f1f1f1;
-    padding: 8px;
-    border-radius: 8px;
-    margin-top: 15px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -196,14 +147,12 @@ def build_features_cached(df, target_col, lags, rolls):
     x["prev_prime"] = prev.isin(primes).astype(np.float32)
     x["prev_mod3"] = prev % 3
     
-    # Cyclical Time
     dt = x["date"].dt
     weekday = dt.weekday.astype(float)
     x["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
     x["weekday_cos"] = np.cos(2 * np.pi * weekday / 7)
     
     for lag in lags: x[f"lag_{lag}"] = target.shift(lag)
-        
     x["diff_1"] = (prev - target.shift(2)).abs()
     
     shifted = target.shift(1)
@@ -212,7 +161,6 @@ def build_features_cached(df, target_col, lags, rolls):
         x[f"roll_std_{w}"] = shifted.rolling(w, min_periods=1).std().fillna(0)
         x[f"ema_{w}"] = shifted.ewm(span=w, adjust=False).mean()
 
-    # Skip tracking
     prev_arr = shifted.to_numpy()
     n = len(prev_arr)
     idx = np.arange(n)
@@ -251,7 +199,7 @@ def model_probs(model, X):
         return np.ones(10) / 10
 
 # ==============================================================================
-# 6. SINGULARITY STATISTICAL SYSTEM (MTBO Z-SCORE)
+# 6. SINGULARITY STATISTICAL SYSTEM
 # ==============================================================================
 
 class SingularityStatSystem:
@@ -264,12 +212,11 @@ class SingularityStatSystem:
         mask = seq[:-1] == last
         next_values = seq[1:][mask]
         counts = np.bincount(next_values, minlength=10).astype(float)
-        counts += 0.8 # Smoothing
+        counts += 0.8 
         return normalize_probs(counts)
 
     @staticmethod
     def mtbo_skip(seq):
-        """Mean Time Between Occurrences (MTBO) Z-Score"""
         seq = np.asarray(seq, dtype=int)
         n = len(seq)
         if n == 0: return np.ones(10) / 10
@@ -285,18 +232,11 @@ class SingularityStatSystem:
                 avg_gap, std_gap = 10.0, 5.0
                 
             current_gap = n - pos[-1] - 1 if len(pos) else 60
-            
-            # คำนวณ Z-Score ถ้า current_gap ต่ำกว่า avg_gap มากๆ แปลว่าเพิ่งออก โอกาสดับสูง (ค่า z ติดลบ)
             z = (current_gap - avg_gap) / std_gap
-            
-            # ผสมผสานกับ Frequency พื้นฐาน
             freq = np.mean(seq == d)
-            
-            # Sigmoid mapping สำหรับ Z-score
             prob_z = 1 / (1 + np.exp(-z))
             
             result[d] = (0.7 * prob_z) + (0.3 * freq)
-            
         return normalize_probs(result)
 
     @staticmethod
@@ -319,40 +259,30 @@ class SingularityAI:
         self.n = len(df)
         self.cfg = get_adaptive_config(self.n)
         
-        self.trees = self.cfg["trees"]
-        self.depth = self.cfg["max_depth"]
-        self.lags = self.cfg["lags"]
-        self.rolls = self.cfg["rolls"]
-        
         self.models = {
             "LR": make_pipeline(
                 StandardScaler(), 
                 LogisticRegression(max_iter=300, class_weight='balanced', C=0.5, random_state=42)
             ),
-            "ET": ExtraTreesClassifier(n_estimators=self.trees, max_depth=self.depth, min_samples_leaf=2, max_features="sqrt", class_weight="balanced", random_state=43, n_jobs=-1),
-            "RF": RandomForestClassifier(n_estimators=self.trees, max_depth=self.depth, min_samples_leaf=2, max_features="log2", class_weight="balanced", random_state=44, n_jobs=-1),
-            "HGB": HistGradientBoostingClassifier(max_iter=70, max_depth=min(6, self.depth), learning_rate=0.04, min_samples_leaf=3, l2_regularization=1.0, random_state=45)
+            "ET": ExtraTreesClassifier(n_estimators=self.cfg["trees"], max_depth=self.cfg["max_depth"], min_samples_leaf=2, max_features="sqrt", class_weight="balanced", random_state=43, n_jobs=-1),
+            "RF": RandomForestClassifier(n_estimators=self.cfg["trees"], max_depth=self.cfg["max_depth"], min_samples_leaf=2, max_features="log2", class_weight="balanced", random_state=44, n_jobs=-1),
+            "HGB": HistGradientBoostingClassifier(max_iter=70, max_depth=min(6, self.cfg["max_depth"]), learning_rate=0.04, min_samples_leaf=3, l2_regularization=1.0, random_state=45)
         }
 
     def train_predict(self, X_train, y_train, X_predict, weights=None):
         if weights is None: weights = {"LR": 0.20, "ET": 0.30, "RF": 0.30, "HGB": 0.20}
         result = np.zeros(10)
         total = 0.0
-        
         for name, base in self.models.items():
             w = float(weights.get(name, 0))
             if w <= 0: continue
             try:
-                model = base # For pipeline, we just use it directly (it clones internally inside cross_val, but here we fit directly)
-                from sklearn.base import clone
                 model_clone = clone(base)
                 model_clone.fit(X_train, y_train)
                 p = model_probs(model_clone, X_predict)
                 result += p * w
                 total += w
-            except Exception:
-                continue
-                
+            except: continue
         if total <= 0: return np.ones(10) / 10
         return normalize_probs(result / total)
 
@@ -363,16 +293,13 @@ class SingularityAI:
             
         start = max(min_train, n - steps)
         indices = np.arange(start, n)
-        
         proxy = ExtraTreesClassifier(n_estimators=30, max_depth=5, min_samples_leaf=3, random_state=99, n_jobs=-1)
-        
         ai_hits, stat_hits, day_hits, count = 0, 0, 0, 0
         values = y.to_numpy(dtype=int)
         
         for i in indices:
             X_train, y_train = X.iloc[:i], y.iloc[:i]
             actual = int(y.iloc[i])
-            
             try:
                 proxy.fit(X_train, y_train)
                 p_ai = model_probs(proxy, X.iloc[[i]])
@@ -396,8 +323,7 @@ class SingularityAI:
         
         future = {"date": target_date, "draw_num": "000", "hundred": np.nan, "ten": np.nan, "unit": np.nan, "bot_ten": np.nan, "bot_unit": np.nan}
         extended = pd.concat([self.df, pd.DataFrame([future])], ignore_index=True)
-        
-        features = build_features_cached(extended, self.target_col, self.lags, self.rolls)
+        features = build_features_cached(extended, self.target_col, self.cfg["lags"], self.cfg["rolls"])
         drop_cols = ["date", "draw_num", "hundred", "ten", "unit", "bot_ten", "bot_unit", self.target_col]
         
         X_all = features.iloc[:-1].drop(columns=drop_cols, errors="ignore")
@@ -406,14 +332,11 @@ class SingularityAI:
         
         bt = self.walk_forward(X_all, y_all, self.df)
         
-        # Exponential Penalty for Weights
         base_ai, base_stat, base_day = 0.50, 0.35, 0.15
         if bt["steps"] > 0:
-            # ใช้ Exponential ยกกำลัง ถ้าทายถูกเยอะจะได้น้ำหนักพุ่ง ทายผิดน้ำหนักจม
             ai_score = np.exp(5 * (bt["ai"] - 0.5))
             stat_score = np.exp(5 * (bt["stat"] - 0.5))
             day_score = np.exp(5 * (bt["day"] - 0.5))
-            
             total = (base_ai * ai_score) + (base_stat * stat_score) + (base_day * day_score)
             w_ai = (base_ai * ai_score) / total
             w_stat = (base_stat * stat_score) / total
@@ -422,35 +345,22 @@ class SingularityAI:
             w_ai, w_stat, w_day = base_ai, base_stat, base_day
             
         ai_probs = self.train_predict(X_all, y_all, X_predict)
-        
         seq = y_all.to_numpy(dtype=int)
         p_stat = normalize_probs((0.4 * SingularityStatSystem.markov_blend(seq)) + (0.6 * SingularityStatSystem.mtbo_skip(seq)))
         p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
         
-        # ----------------------------------------------------------------------
-        # CONSENSUS VARIANCE PENALTY (V7.0 CORE)
-        # ----------------------------------------------------------------------
-        # 1. หาค่าเฉลี่ยถ่วงน้ำหนัก
+        # Consensus Variance Penalty
         mean_probs = (w_ai * ai_probs) + (w_stat * p_stat) + (w_day * p_day)
-        
-        # 2. หาความขัดแย้ง (Standard Deviation) ระหว่าง AI, Stat, Day ของเลขแต่ละตัว
         stacked_probs = np.vstack([ai_probs, p_stat, p_day])
         std_probs = np.std(stacked_probs, axis=0)
-        
-        # 3. สร้าง Final Score (ยิ่งน้อย = ยิ่งดับชัวร์)
-        # ถ้าโมเดลขัดแย้งกัน (std_probs สูง) เราจะบวกค่า Penalty เข้าไป ทำให้คะแนนพุ่งขึ้น (หลุดจากการเป็นเลขดับ)
-        # C = 1.5 คือตัวคูณ Penalty 
         final_score = mean_probs + (1.5 * std_probs)
-        
-        # แปลงกลับเป็น Probabilities สำหรับฟังก์ชัน get_dead_numbers
         final = normalize_probs(final_score, temperature=1.0)
-        
-        bt_msg = f"WF {bt['steps']} งวด: AI {bt['ai']:.0%} | สถิติ {bt['stat']:.0%} | วัน {bt['day']:.0%}"
         
         return {
             "ai": ai_probs, "stat": p_stat, "day": p_day, "final": final,
-            "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, "bt_msg": bt_msg,
-            "std_max": np.max(std_probs) # For UI display
+            "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, 
+            "bt_ai": bt["ai"], "bt_stat": bt["stat"], "bt_day": bt["day"], "bt_steps": bt["steps"],
+            "std_max": np.max(std_probs)
         }
 
 # ==============================================================================
@@ -458,8 +368,6 @@ class SingularityAI:
 # ==============================================================================
 
 def get_dead_numbers(probs, k=7):
-    # สำหรับ V7, ค่า prob ตอนนี้คือ final_score ที่โดนบวก penalty เข้าไปแล้ว
-    # ตัวไหนน้อยสุด คือตัวที่เห็นพ้องต้องกันว่า "ดับ" มากที่สุด
     idx = np.argsort(probs)[:k]
     return [(int(i), float(probs[i])) for i in idx]
 
@@ -535,38 +443,86 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             dead_stat = get_dead_numbers(result["stat"], 7)
             dead_day = get_dead_numbers(result["day"], 7)
             
+            # -------------------------------------------------------------
+            # NEW PREMIUM UI INJECTION
+            # -------------------------------------------------------------
             st.markdown(
                 f"""
-                <div class="dead-card">
-                    <div class="position-title">{position_name}</div>
+                <div style="background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 20px;">
                     
-                    <div style="text-align:center; color:#B71C1C; font-weight:bold; font-size:16px;">
-                        🚫 ดับเอกฉันท์ 7 ตัว (Consensus Top-7)
-                    </div>
-                    <div class="dead-number-highlight">{format_dead(dead_final)}</div>
-                    
-                    <div style="margin-top:16px; border-top:1px solid #eee; padding-top:12px;">
-                        <div class="info-row">
-                            <span>🤖 <b>AI (LR+ET+RF+HGB):</b></span>
-                            <span class="badge badge-ai">{format_dead(dead_ai)}</span>
-                        </div>
-                        <div class="info-row">
-                            <span>📊 <b>สถิติ (MTBO+Markov):</b></span>
-                            <span class="badge badge-stat">{format_dead(dead_stat)}</span>
-                        </div>
-                        <div class="info-row">
-                            <span>📅 <b>วัน:</b></span>
-                            <span class="badge badge-day">{format_dead(dead_day)}</span>
-                        </div>
+                    <!-- Header: ตำแหน่ง / ชื่อ -->
+                    <div style="font-size: 20px; font-weight: 900; color: #222; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px;">
+                        {position_name}
                     </div>
                     
-                    <div class="metric-box">
-                        <b>Walk-Forward:</b> {result["bt_msg"]}<br>
-                        <b>Weights:</b> AI {result["w_ai"]:.0%} | Stat {result["w_stat"]:.0%} | Day {result["w_day"]:.0%}<br>
-                        <b>Max Disagreement (Penalty):</b> +{(result['std_max']*100):.1f}
+                    <!-- ส่วนที่ 1: เลขดับเอกฉันท์ -->
+                    <div style="background: linear-gradient(135deg, #fff5f5, #ffebee); border: 2px solid #ffcdd2; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
+                        <div style="color: #D32F2F; font-weight: 800; font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">
+                            🚫 ดับเอกฉันท์ 7 ตัว (Consensus Top-7)
+                        </div>
+                        <div style="font-size: 36px; font-weight: 900; color: #B71C1C; letter-spacing: 8px; text-shadow: 1px 1px 0px rgba(255,255,255,0.8);">
+                            {format_dead(dead_final)}
+                        </div>
                     </div>
+
+                    <!-- ส่วนที่ 2: ที่มาของเลข -->
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #1976D2;">
+                            <span style="font-size: 14px; color: #333;">🤖 <b>AI (LR+ET+RF+HGB)</b></span>
+                            <span style="background: #E3F2FD; color: #1565C0; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                                {format_dead(dead_ai)}
+                            </span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #388E3C;">
+                            <span style="font-size: 14px; color: #333;">📊 <b>สถิติ (MTBO+Markov)</b></span>
+                            <span style="background: #E8F5E9; color: #2E7D32; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                                {format_dead(dead_stat)}
+                            </span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #F57C00;">
+                            <span style="font-size: 14px; color: #333;">📅 <b>วัน</b></span>
+                            <span style="background: #FFF3E0; color: #E65100; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                                {format_dead(dead_day)}
+                            </span>
+                        </div>
+
+                    </div>
+
+                    <!-- ส่วนที่ 3: Analytics Dashboard -->
+                    <div style="background: #263238; border-radius: 10px; padding: 15px; color: #CFD8DC; font-family: sans-serif;">
+                        <div style="text-align: center; color: #ffffff; font-weight: bold; font-size: 14px; margin-bottom: 12px; letter-spacing: 0.5px;">
+                            ⚡ Walk-Forward Analysis (WF {result['bt_steps']} งวด)
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; text-align: center; border-bottom: 1px solid #37474F; padding-bottom: 12px; margin-bottom: 12px;">
+                            <div style="flex: 1;">
+                                <div style="color: #64B5F6; font-size: 12px; margin-bottom: 4px;">🤖 ความแม่น AI</div>
+                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_ai']*100):.0f}%</div>
+                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_ai']*100):.0f}%</div>
+                            </div>
+                            <div style="flex: 1; border-left: 1px solid #37474F; border-right: 1px solid #37474F;">
+                                <div style="color: #81C784; font-size: 12px; margin-bottom: 4px;">📊 ความแม่นสถิติ</div>
+                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_stat']*100):.0f}%</div>
+                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_stat']*100):.0f}%</div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="color: #FFB74D; font-size: 12px; margin-bottom: 4px;">📅 ความแม่นวัน</div>
+                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_day']*100):.0f}%</div>
+                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_day']*100):.0f}%</div>
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; color: #FF8A65; font-size: 13px; font-weight: 700;">
+                            ⚠️ Max Disagreement (Penalty): +{(result['std_max']*100):.1f}
+                        </div>
+                    </div>
+
                 </div>
-                """, unsafe_allow_html=True
+                """,
+                unsafe_allow_html=True
             )
             
         progress.empty()
