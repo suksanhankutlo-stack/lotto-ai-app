@@ -4,12 +4,12 @@
 # SEQUENTIAL DRAW-TO-DRAW
 # STRICT WALK-FORWARD
 # TOP-3 OPTIMIZED
-# HOT TOP-3
-# DEAD TOP-7
+# HOT TOP-3 ONLY
 # TIME-DECAY BACKTEST
 # DYNAMIC ENSEMBLE WEIGHT
 # LEAKAGE SAFE
 # MOBILE FRIENDLY
+# NO DEAD NUMBER
 # ============================================================
 
 import streamlit as st
@@ -28,7 +28,10 @@ from sklearn.ensemble import (
     HistGradientBoostingClassifier
 )
 
-# XGBoost = optional
+# ============================================================
+# OPTIONAL XGBOOST
+# ============================================================
+
 try:
     from xgboost import XGBClassifier
     XGB_AVAILABLE = True
@@ -43,7 +46,7 @@ warnings.filterwarnings("ignore")
 # ============================================================
 
 st.set_page_config(
-    page_title="Lotto AI Ultimate V.Max 3-Top",
+    page_title="Lotto AI Ultimate V.Max",
     page_icon="🚀",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -51,10 +54,61 @@ st.set_page_config(
 
 
 # ============================================================
-# 1. LOTTERY SOURCES
+# 1. MOBILE CSS
+# ============================================================
+
+st.markdown("""
+<style>
+
+.main-title {
+    font-size: 27px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 3px;
+}
+
+.sub-title {
+    text-align: center;
+    color: #777;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.hot-box {
+    padding: 15px;
+    border-radius: 15px;
+    border: 2px solid #ff9800;
+    margin: 8px 0;
+}
+
+.position-box {
+    padding: 13px;
+    border-radius: 14px;
+    border: 1px solid rgba(128,128,128,0.25);
+    margin-bottom: 10px;
+}
+
+.big-number {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 3px;
+}
+
+.prob-number {
+    font-size: 13px;
+    color: #777;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# 2. LOTTERY SOURCES
 # ============================================================
 
 LOTTERY_SOURCES = {
+
     "1. หวยไทย":
         "https://suksan18190.blogspot.com/2026/07/blog-post_07.html",
 
@@ -88,77 +142,24 @@ LOTTERY_SOURCES = {
 
 
 # ============================================================
-# 2. CUSTOM CSS
-# ============================================================
-
-st.markdown("""
-<style>
-
-.main-title {
-    font-size: 27px;
-    font-weight: 800;
-    text-align: center;
-    margin-bottom: 4px;
-}
-
-.sub-title {
-    text-align: center;
-    color: #777;
-    font-size: 14px;
-    margin-bottom: 15px;
-}
-
-.position-card {
-    padding: 14px;
-    border-radius: 14px;
-    border: 1px solid rgba(128,128,128,0.25);
-    margin-bottom: 12px;
-}
-
-.hot-box {
-    padding: 14px;
-    border-radius: 14px;
-    border: 2px solid #ff9800;
-    margin-bottom: 10px;
-}
-
-.dead-box {
-    padding: 14px;
-    border-radius: 14px;
-    border: 2px solid #777;
-    margin-bottom: 10px;
-}
-
-.big-number {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: 3px;
-}
-
-.small-label {
-    font-size: 13px;
-    color: #777;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
 # 3. FETCH DATA
 # ============================================================
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(
+    ttl=300,
+    show_spinner=False
+)
 def fetch_and_clean_data(url):
 
     try:
 
         headers = {
             "User-Agent":
-            "Mozilla/5.0 (Linux; Android 10) "
-            "AppleWebKit/537.36 "
-            "(KHTML, like Gecko) "
-            "Chrome/120 Mobile Safari/537.36"
+                "Mozilla/5.0 "
+                "(Linux; Android 10) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/120 Mobile Safari/537.36"
         }
 
         response = requests.get(
@@ -202,7 +203,9 @@ def fetch_and_clean_data(url):
             r"\b(\d{5,6})\b.*?\b(\d{2})\b"
         )
 
-        current_date = pd.Timestamp(datetime.now())
+        current_date = pd.Timestamp(
+            datetime.now()
+        )
 
         for line in text_lines:
 
@@ -211,14 +214,19 @@ def fetch_and_clean_data(url):
             if not line:
                 continue
 
-            date_match = date_pattern.search(line)
+            date_match = (
+                date_pattern.search(line)
+            )
 
             if date_match:
 
                 try:
-                    parsed_date = pd.to_datetime(
-                        date_match.group(1),
-                        errors="coerce"
+
+                    parsed_date = (
+                        pd.to_datetime(
+                            date_match.group(1),
+                            errors="coerce"
+                        )
                     )
 
                     if not pd.isna(parsed_date):
@@ -227,36 +235,61 @@ def fetch_and_clean_data(url):
                 except Exception:
                     pass
 
-            num_match = num_pattern.search(line)
+            num_match = (
+                num_pattern.search(line)
+            )
 
             if not num_match:
                 continue
 
-            if num_match.group(1) and num_match.group(2):
+            if (
+                num_match.group(1)
+                and
+                num_match.group(2)
+            ):
 
                 res3d = num_match.group(1)
                 res2d = num_match.group(2)
 
-            elif num_match.group(3) and num_match.group(4):
+            elif (
+                num_match.group(3)
+                and
+                num_match.group(4)
+            ):
 
-                res3d = num_match.group(3)[-3:]
-                res2d = num_match.group(4)
+                res3d = (
+                    num_match
+                    .group(3)[-3:]
+                )
+
+                res2d = (
+                    num_match.group(4)
+                )
 
             else:
                 continue
 
             extracted.append({
-                "Date": current_date,
-                "Result_3D": str(res3d).zfill(3),
-                "Result_2D": str(res2d).zfill(2)
+
+                "Date":
+                    current_date,
+
+                "Result_3D":
+                    str(res3d).zfill(3),
+
+                "Result_2D":
+                    str(res2d).zfill(2)
             })
 
         if len(extracted) < 10:
+
             raise ValueError(
                 "ข้อมูลที่ดึงมาไม่เพียงพอ"
             )
 
-        df = pd.DataFrame(extracted)
+        df = pd.DataFrame(
+            extracted
+        )
 
         df["Date"] = pd.to_datetime(
             df["Date"],
@@ -279,9 +312,10 @@ def fetch_and_clean_data(url):
             ]
         )
 
-        df = df.sort_values(
-            "Date"
-        ).reset_index(drop=True)
+        df = (
+            df.sort_values("Date")
+            .reset_index(drop=True)
+        )
 
         return df
 
@@ -298,12 +332,16 @@ def fetch_and_clean_data(url):
 # 4. FEATURE ENGINEERING
 # ============================================================
 
-def build_features(df, lags, rolls):
+def build_features(
+    df,
+    lags,
+    rolls
+):
 
     df_feat = df.copy()
 
     # --------------------------------------------------------
-    # Digit extraction
+    # DIGITS
     # --------------------------------------------------------
 
     df_feat["H"] = (
@@ -342,7 +380,7 @@ def build_features(df, lags, rolls):
     )
 
     # --------------------------------------------------------
-    # Calendar
+    # CALENDAR
     # --------------------------------------------------------
 
     df_feat["DayOfWeek"] = (
@@ -391,62 +429,38 @@ def build_features(df, lags, rolls):
     )
 
     # --------------------------------------------------------
-    # Previous draw only
+    # PREVIOUS DRAW FEATURES
     # --------------------------------------------------------
 
     df_feat["PrevSum3"] = (
         df_feat["H"].shift(1)
-        + df_feat["T"].shift(1)
-        + df_feat["O"].shift(1)
+        +
+        df_feat["T"].shift(1)
+        +
+        df_feat["O"].shift(1)
     )
 
+    prev3 = df_feat[
+        ["H", "T", "O"]
+    ].shift(1)
+
     df_feat["PrevRange3"] = (
-        df_feat[
-            ["H", "T", "O"]
-        ]
-        .shift(1)
-        .max(axis=1)
+        prev3.max(axis=1)
         -
-        df_feat[
-            ["H", "T", "O"]
-        ]
-        .shift(1)
-        .min(axis=1)
+        prev3.min(axis=1)
     )
 
     df_feat["PrevOdd3"] = (
-        (
-            df_feat["H"].shift(1)
-            % 2
-        )
-        +
-        (
-            df_feat["T"].shift(1)
-            % 2
-        )
-        +
-        (
-            df_feat["O"].shift(1)
-            % 2
-        )
-    )
+        prev3 % 2
+    ).sum(axis=1)
 
     df_feat["PrevHigh3"] = (
-        (
-            df_feat["H"].shift(1) >= 5
-        ).astype(int)
-        +
-        (
-            df_feat["T"].shift(1) >= 5
-        ).astype(int)
-        +
-        (
-            df_feat["O"].shift(1) >= 5
-        ).astype(int)
+        (prev3 >= 5)
+        .sum(axis=1)
     )
 
     # --------------------------------------------------------
-    # Cross digit
+    # DISTANCE
     # --------------------------------------------------------
 
     df_feat["Dist_HT"] = (
@@ -475,38 +489,41 @@ def build_features(df, lags, rolls):
         "O2"
     ]
 
-    prime_digits = [2, 3, 5, 7]
+    prime_digits = [
+        2, 3, 5, 7
+    ]
 
     # --------------------------------------------------------
-    # Position features
+    # POSITION FEATURES
     # --------------------------------------------------------
 
     for pos in positions:
 
-        prev = df_feat[pos].shift(1)
+        prev = (
+            df_feat[pos]
+            .shift(1)
+        )
 
-        # Odd / Even
         df_feat[
             f"OddEven_{pos}"
         ] = (
             prev % 2
         ).fillna(0)
 
-        # High / Low
         df_feat[
             f"HighLow_{pos}"
         ] = (
             prev >= 5
         ).fillna(0).astype(int)
 
-        # Prime
         df_feat[
             f"IsPrime_{pos}"
         ] = (
-            prev.isin(prime_digits)
+            prev.isin(
+                prime_digits
+            )
         ).astype(int)
 
-        # Mirror
         df_feat[
             f"Mirror_{pos}"
         ] = (
@@ -514,20 +531,26 @@ def build_features(df, lags, rolls):
         ).fillna(0)
 
         # ----------------------------------------------------
-        # Lags
+        # LAGS
         # ----------------------------------------------------
 
         for lag in lags:
 
             df_feat[
                 f"Lag_{lag}_{pos}"
-            ] = df_feat[pos].shift(lag)
+            ] = (
+                df_feat[pos]
+                .shift(lag)
+            )
 
         # ----------------------------------------------------
-        # Rolling
+        # ROLLING
         # ----------------------------------------------------
 
-        shifted = df_feat[pos].shift(1)
+        shifted = (
+            df_feat[pos]
+            .shift(1)
+        )
 
         for w in rolls:
 
@@ -554,13 +577,15 @@ def build_features(df, lags, rolls):
             )
 
         # ----------------------------------------------------
-        # Repeat
+        # REPEAT
         # ----------------------------------------------------
 
         if (
-            f"Lag_1_{pos}" in df_feat.columns
+            f"Lag_1_{pos}" in
+            df_feat.columns
             and
-            f"Lag_2_{pos}" in df_feat.columns
+            f"Lag_2_{pos}" in
+            df_feat.columns
         ):
 
             df_feat[
@@ -582,7 +607,7 @@ def build_features(df, lags, rolls):
             ] = 0
 
         # ----------------------------------------------------
-        # Hot20
+        # HOT20
         # ----------------------------------------------------
 
         for d in range(10):
@@ -600,10 +625,12 @@ def build_features(df, lags, rolls):
             )
 
         # ----------------------------------------------------
-        # Skip
+        # SKIP
         # ----------------------------------------------------
 
-        values = df_feat[pos].values
+        values = (
+            df_feat[pos].values
+        )
 
         skips = np.zeros(
             len(values),
@@ -612,21 +639,25 @@ def build_features(df, lags, rolls):
 
         last_seen = {}
 
-        for i, value in enumerate(values):
+        for i, value in enumerate(
+            values
+        ):
 
             if i == 0:
 
                 skips[i] = 100
 
+            elif value in last_seen:
+
+                skips[i] = (
+                    i
+                    -
+                    last_seen[value]
+                )
+
             else:
 
-                if value in last_seen:
-                    skips[i] = (
-                        i -
-                        last_seen[value]
-                    )
-                else:
-                    skips[i] = i
+                skips[i] = i
 
             last_seen[value] = i
 
@@ -635,15 +666,17 @@ def build_features(df, lags, rolls):
         ] = skips
 
     # --------------------------------------------------------
-    # Clean
+    # CLEAN
     # --------------------------------------------------------
 
-    df_feat = df_feat.replace(
-        [np.inf, -np.inf],
-        np.nan
+    df_feat = (
+        df_feat
+        .replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
+        .fillna(-1)
     )
-
-    df_feat = df_feat.fillna(-1)
 
     return df_feat
 
@@ -667,24 +700,18 @@ class PositionalEquation:
         values = [
 
             (H + T) % 10,
-
             (T + O) % 10,
-
             abs(H - O) % 10,
-
             (H * T) % 10,
-
             (H + T + O) % 10,
-
             (H * 2 + O) % 10,
-
             (T * 2 + H) % 10,
-
             (H + O * 2) % 10
 
         ]
 
         for v in values:
+
             probs[int(v)] += 1
 
         probs += 0.05
@@ -701,7 +728,11 @@ class PositionalEquation:
 
 class FrequencyEngine:
 
-    def analyze(self, df, pos):
+    def analyze(
+        self,
+        df,
+        pos
+    ):
 
         series = (
             df[pos]
@@ -710,7 +741,10 @@ class FrequencyEngine:
         )
 
         if len(series) == 0:
-            return np.ones(10) / 10
+
+            return (
+                np.ones(10) / 10
+            )
 
         probs = np.zeros(10)
 
@@ -758,40 +792,39 @@ class FrequencyEngine:
 
                 skip = len(series)
 
-            # Frequency
-            f_all = freq_all.get(
-                i,
-                0
-            )
-
-            f10 = freq_10.get(
-                i,
-                0
-            )
-
-            f20 = freq_20.get(
-                i,
-                0
-            )
-
-            # Recent emphasis
             recent_score = (
-                f10 * 0.50
+
+                freq_10.get(
+                    i,
+                    0
+                ) * 0.50
+
                 +
-                f20 * 0.30
+
+                freq_20.get(
+                    i,
+                    0
+                ) * 0.30
+
                 +
-                f_all * 0.20
+
+                freq_all.get(
+                    i,
+                    0
+                ) * 0.20
             )
 
-            # Small skip component
             skip_score = (
                 1.0 /
                 (skip + 1)
             )
 
             probs[i] = (
+
                 recent_score * 0.85
+
                 +
+
                 skip_score * 0.15
             )
 
@@ -804,7 +837,7 @@ class FrequencyEngine:
 
 
 # ============================================================
-# 7. CONDITIONAL / CALENDAR
+# 7. CONDITIONAL SYSTEM
 # ============================================================
 
 class ConditionalSystem:
@@ -825,10 +858,12 @@ class ConditionalSystem:
         ]
 
         if len(subset) < 5:
+
             subset = df
 
-        # Recent same weekday gets extra importance
-        recent_subset = subset.tail(20)
+        recent = (
+            subset.tail(20)
+        )
 
         freq_all = (
             subset[pos]
@@ -839,7 +874,7 @@ class ConditionalSystem:
         )
 
         freq_recent = (
-            recent_subset[pos]
+            recent[pos]
             .value_counts(
                 normalize=True
             )
@@ -849,11 +884,18 @@ class ConditionalSystem:
         for i in range(10):
 
             probs[i] = (
-                freq_all.get(i, 0)
-                * 0.40
+
+                freq_all.get(
+                    i,
+                    0
+                ) * 0.40
+
                 +
-                freq_recent.get(i, 0)
-                * 0.60
+
+                freq_recent.get(
+                    i,
+                    0
+                ) * 0.60
             )
 
         probs += 0.01
@@ -870,26 +912,37 @@ class ConditionalSystem:
 
 class StateTransitionSystem:
 
-    def analyze(self, df, pos):
-
-        probs = np.zeros(10)
+    def analyze(
+        self,
+        df,
+        pos
+    ):
 
         if len(df) < 5:
-            return np.ones(10) / 10
+
+            return (
+                np.ones(10) / 10
+            )
+
+        probs = np.zeros(10)
 
         last_value = int(
             df[pos].iloc[-1]
         )
 
         subset = df[
-            df[f"Lag_1_{pos}"]
+            df[
+                f"Lag_1_{pos}"
+            ]
             ==
             last_value
         ]
 
         if len(subset) < 2:
 
-            return np.ones(10) / 10
+            return (
+                np.ones(10) / 10
+            )
 
         freq = (
             subset[pos]
@@ -900,6 +953,7 @@ class StateTransitionSystem:
         )
 
         for i in range(10):
+
             probs[i] = freq.get(
                 i,
                 0
@@ -919,12 +973,19 @@ class StateTransitionSystem:
 
 class PatternBacktestSystem:
 
-    def analyze(self, df, pos):
-
-        probs = np.zeros(10)
+    def analyze(
+        self,
+        df,
+        pos
+    ):
 
         if len(df) < 5:
-            return np.ones(10) / 10
+
+            return (
+                np.ones(10) / 10
+            )
+
+        probs = np.zeros(10)
 
         l1 = int(
             df[pos].iloc[-1]
@@ -936,26 +997,37 @@ class PatternBacktestSystem:
 
         subset = df[
             (
-                df[f"Lag_1_{pos}"]
-                == l1
+                df[
+                    f"Lag_1_{pos}"
+                ]
+                ==
+                l1
             )
             &
             (
-                df[f"Lag_2_{pos}"]
-                == l2
+                df[
+                    f"Lag_2_{pos}"
+                ]
+                ==
+                l2
             )
         ]
 
         if len(subset) < 2:
 
             subset = df[
-                df[f"Lag_1_{pos}"]
-                == l1
+                df[
+                    f"Lag_1_{pos}"
+                ]
+                ==
+                l1
             ]
 
         if len(subset) == 0:
 
-            return np.ones(10) / 10
+            return (
+                np.ones(10) / 10
+            )
 
         freq = (
             subset[pos]
@@ -966,6 +1038,7 @@ class PatternBacktestSystem:
         )
 
         for i in range(10):
+
             probs[i] = freq.get(
                 i,
                 0
@@ -1001,13 +1074,18 @@ class AISystem:
         self.hgb_w = hgb_w
         self.xgb_w = xgb_w
 
-    def _make_models(self):
+    def analyze(
+        self,
+        X_train,
+        y_train,
+        X_next
+    ):
 
         models = []
         weights = []
 
         # ----------------------------------------------------
-        # Random Forest
+        # RF
         # ----------------------------------------------------
 
         models.append(
@@ -1027,7 +1105,7 @@ class AISystem:
         )
 
         # ----------------------------------------------------
-        # Extra Trees
+        # EXTRA TREES
         # ----------------------------------------------------
 
         models.append(
@@ -1047,7 +1125,7 @@ class AISystem:
         )
 
         # ----------------------------------------------------
-        # HistGradientBoosting
+        # HGB
         # ----------------------------------------------------
 
         models.append(
@@ -1066,7 +1144,7 @@ class AISystem:
         )
 
         # ----------------------------------------------------
-        # XGBoost optional
+        # XGB
         # ----------------------------------------------------
 
         if (
@@ -1095,19 +1173,6 @@ class AISystem:
             weights.append(
                 self.xgb_w
             )
-
-        return models, weights
-
-    def analyze(
-        self,
-        X_train,
-        y_train,
-        X_next
-    ):
-
-        models, weights = (
-            self._make_models()
-        )
 
         final = np.zeros(10)
 
@@ -1145,26 +1210,34 @@ class AISystem:
                     temp[int(c)] = p
 
                 final += (
-                    temp *
-                    weight
+                    temp * weight
                 )
 
                 used_weight += weight
 
             except Exception:
+
                 continue
 
         if used_weight <= 0:
-            return np.ones(10) / 10
+
+            return (
+                np.ones(10) / 10
+            )
 
         final /= used_weight
 
         total = final.sum()
 
         if total <= 0:
-            return np.ones(10) / 10
 
-        return final / total
+            return (
+                np.ones(10) / 10
+            )
+
+        return (
+            final / total
+        )
 
 
 # ============================================================
@@ -1180,9 +1253,13 @@ class EnsembleEngine:
         target_dow=None
     ):
 
-        self.df_raw = df_raw.copy()
+        self.df_raw = (
+            df_raw.copy()
+        )
 
-        self.target_dow = target_dow
+        self.target_dow = (
+            target_dow
+        )
 
         self.lottery_name = (
             lottery_name
@@ -1191,7 +1268,7 @@ class EnsembleEngine:
         n = len(df_raw)
 
         # ----------------------------------------------------
-        # Adaptive Config
+        # ADAPTIVE MODE
         # ----------------------------------------------------
 
         if n >= 700:
@@ -1294,15 +1371,27 @@ class EnsembleEngine:
                 0.20
             )
 
-        if n < 100:
+        # ----------------------------------------------------
+        # BASE WEIGHT
+        # ----------------------------------------------------
 
-            self.test_size = min(
-                8,
-                max(0, n - 30)
-            )
+        self.base_weights = {
+
+            "AI": 0.40,
+
+            "Freq": 0.18,
+
+            "ST": 0.12,
+
+            "Cal": 0.10,
+
+            "BT": 0.12,
+
+            "Eq": 0.08
+        }
 
         # ----------------------------------------------------
-        # Feature list
+        # FEATURES
         # ----------------------------------------------------
 
         self.features = [
@@ -1315,6 +1404,7 @@ class EnsembleEngine:
 
             "DOW_SIN",
             "DOW_COS",
+
             "MONTH_SIN",
             "MONTH_COS",
 
@@ -1328,15 +1418,13 @@ class EnsembleEngine:
             "Dist_HO"
         ]
 
-        positions = [
+        for pos in [
             "H",
             "T",
             "O",
             "T2",
             "O2"
-        ]
-
-        for pos in positions:
+        ]:
 
             self.features.extend([
 
@@ -1357,7 +1445,9 @@ class EnsembleEngine:
             for w in self.rolls:
 
                 self.features.extend([
+
                     f"Roll_{w}_Mean_{pos}",
+
                     f"Roll_{w}_Std_{pos}"
                 ])
 
@@ -1368,7 +1458,7 @@ class EnsembleEngine:
                 )
 
         # ----------------------------------------------------
-        # Systems
+        # SYSTEMS
         # ----------------------------------------------------
 
         self.pos_sys = (
@@ -1396,30 +1486,11 @@ class EnsembleEngine:
             *self.ai_weights
         )
 
-        # ----------------------------------------------------
-        # Base weights
-        # ----------------------------------------------------
-
-        self.base_weights = {
-
-            "AI": 0.40,
-
-            "Freq": 0.18,
-
-            "ST": 0.12,
-
-            "Cal": 0.10,
-
-            "BT": 0.12,
-
-            "Eq": 0.08
-        }
-
     # ========================================================
-    # BACKTEST
+    # SINGLE POSITION
     # ========================================================
 
-    def _process_single_position(
+    def process_position(
         self,
         pos,
         df_hist,
@@ -1431,7 +1502,7 @@ class EnsembleEngine:
         bt_size = self.test_size
 
         # ----------------------------------------------------
-        # Default weights
+        # DEFAULT
         # ----------------------------------------------------
 
         if (
@@ -1441,138 +1512,141 @@ class EnsembleEngine:
             bt_size <= 0
         ):
 
-            norm_weights = (
+            W = (
                 self.base_weights.copy()
             )
 
             bt_msg = (
-                "ข้อมูลน้อย → ใช้น้ำหนักพื้นฐาน"
+                "ข้อมูลน้อย → "
+                "ใช้ Base Ensemble"
             )
 
         else:
 
-            ai_hits = 0.0
-            fq_hits = 0.0
-            cal_hits = 0.0
-            st_hits = 0.0
-            ptn_hits = 0.0
+            hits = {
 
-            steps_run = 0
+                "AI": 0.0,
+                "Freq": 0.0,
+                "ST": 0.0,
+                "Cal": 0.0,
+                "BT": 0.0
+            }
+
             total_decay = 0.0
-
-            # ------------------------------------------------
-            # Strict Walk Forward
-            # ------------------------------------------------
+            steps = 0
 
             start_idx = (
                 len(X_all)
-                - bt_size
+                -
+                bt_size
             )
 
-            for i in range(bt_size):
+            # ------------------------------------------------
+            # WALK FORWARD
+            # ------------------------------------------------
 
-                curr_train_len = (
+            for i in range(
+                bt_size
+            ):
+
+                train_len = (
                     start_idx + i
                 )
 
-                if curr_train_len < 35:
+                if train_len < 35:
                     continue
 
-                # --------------------------------------------
-                # Time decay
-                # --------------------------------------------
-
-                decay_weight = (
+                # Latest draws get more weight
+                decay = (
                     1.08 ** i
                 )
 
                 total_decay += (
-                    decay_weight
+                    decay
                 )
 
-                X_train_step = (
+                X_train = (
                     X_all.iloc[
-                        :curr_train_len
+                        :train_len
                     ]
                 )
 
-                y_train_step = (
+                y_train = (
                     df_hist[pos]
                     .iloc[
-                        :curr_train_len
+                        :train_len
                     ]
                 )
 
-                X_test_step = (
+                X_test = (
                     X_all.iloc[
-                        [curr_train_len]
+                        [train_len]
                     ]
                 )
 
-                actual_val = int(
+                actual = int(
                     df_hist[pos]
                     .iloc[
-                        curr_train_len
+                        train_len
                     ]
                 )
 
                 # --------------------------------------------
-                # Fast AI proxy
+                # AI PROXY
                 # --------------------------------------------
-
-                proxy = ExtraTreesClassifier(
-                    n_estimators=25,
-                    max_depth=6,
-                    min_samples_leaf=2,
-                    max_features="sqrt",
-                    class_weight="balanced",
-                    n_jobs=-1,
-                    random_state=100 + i
-                )
 
                 try:
 
-                    proxy.fit(
-                        X_train_step,
-                        y_train_step
+                    proxy = (
+                        ExtraTreesClassifier(
+                            n_estimators=25,
+                            max_depth=6,
+                            min_samples_leaf=2,
+                            max_features="sqrt",
+                            class_weight="balanced",
+                            n_jobs=-1,
+                            random_state=100+i
+                        )
                     )
 
-                    probs = (
+                    proxy.fit(
+                        X_train,
+                        y_train
+                    )
+
+                    pp = (
                         proxy
                         .predict_proba(
-                            X_test_step
+                            X_test
                         )[0]
                     )
 
-                    ai_res = np.zeros(10)
+                    ai = np.zeros(10)
 
                     for c, p in zip(
                         proxy.classes_,
-                        probs
+                        pp
                     ):
 
-                        ai_res[int(c)] = p
+                        ai[int(c)] = p
 
-                    # TOP-3 backtest
-                    ai_top3 = np.argsort(
-                        ai_res
-                    )[::-1][:3]
+                    # TOP-3 ONLY
+                    if actual in np.argsort(
+                        ai
+                    )[::-1][:3]:
 
-                    if actual_val in ai_top3:
-                        ai_hits += (
-                            decay_weight
-                        )
+                        hits["AI"] += decay
 
                 except Exception:
                     pass
 
                 # --------------------------------------------
-                # Historical systems
+                # OTHER SYSTEMS
                 # --------------------------------------------
 
                 curr_df = (
                     df_hist.iloc[
-                        :curr_train_len
+                        :train_len
                     ]
                 )
 
@@ -1580,134 +1654,121 @@ class EnsembleEngine:
                     df_hist[
                         "Date"
                     ].iloc[
-                        curr_train_len
+                        train_len
                     ]
                 )
 
-                fq = self.freq_sys.analyze(
-                    curr_df,
-                    pos
+                fq = (
+                    self.freq_sys
+                    .analyze(
+                        curr_df,
+                        pos
+                    )
                 )
 
-                cal = self.cond_sys.analyze(
-                    curr_df,
-                    pos,
-                    target_date
+                cal = (
+                    self.cond_sys
+                    .analyze(
+                        curr_df,
+                        pos,
+                        target_date
+                    )
                 )
 
-                stp = self.st_sys.analyze(
-                    curr_df,
-                    pos
+                stp = (
+                    self.st_sys
+                    .analyze(
+                        curr_df,
+                        pos
+                    )
                 )
 
-                ptn = self.ptn_sys.analyze(
-                    curr_df,
-                    pos
+                ptn = (
+                    self.ptn_sys
+                    .analyze(
+                        curr_df,
+                        pos
+                    )
                 )
 
-                # TOP-3
-                if actual_val in np.argsort(
+                if actual in np.argsort(
                     fq
                 )[::-1][:3]:
 
-                    fq_hits += (
-                        decay_weight
-                    )
+                    hits["Freq"] += decay
 
-                if actual_val in np.argsort(
+                if actual in np.argsort(
                     cal
                 )[::-1][:3]:
 
-                    cal_hits += (
-                        decay_weight
-                    )
+                    hits["Cal"] += decay
 
-                if actual_val in np.argsort(
+                if actual in np.argsort(
                     stp
                 )[::-1][:3]:
 
-                    st_hits += (
-                        decay_weight
-                    )
+                    hits["ST"] += decay
 
-                if actual_val in np.argsort(
+                if actual in np.argsort(
                     ptn
                 )[::-1][:3]:
 
-                    ptn_hits += (
-                        decay_weight
-                    )
+                    hits["BT"] += decay
 
-                steps_run += 1
+                steps += 1
 
                 if (
-                    steps_run
+                    steps
                     >=
                     self.early_stop
                 ):
                     break
 
             # ------------------------------------------------
-            # Dynamic weight
+            # DYNAMIC WEIGHTS
             # ------------------------------------------------
 
             if (
-                steps_run <= 0
+                steps == 0
                 or
                 total_decay <= 0
             ):
 
-                norm_weights = (
+                W = (
                     self.base_weights.copy()
                 )
 
                 bt_msg = (
-                    "Backtest ไม่สามารถทำงานได้"
+                    "Backtest ไม่สำเร็จ"
                 )
 
             else:
 
                 scores = {
 
-                    "AI":
-                        ai_hits /
-                        total_decay,
+                    key:
+                    hits[key]
+                    /
+                    total_decay
 
-                    "Freq":
-                        fq_hits /
-                        total_decay,
-
-                    "Cal":
-                        cal_hits /
-                        total_decay,
-
-                    "ST":
-                        st_hits /
-                        total_decay,
-
-                    "BT":
-                        ptn_hits /
-                        total_decay
+                    for key in hits
                 }
-
-                # ------------------------------------------------
-                # Squared performance weighting
-                # ------------------------------------------------
 
                 weighted = {}
 
                 for key in scores:
 
-                    # Prevent zeroing
                     score = max(
                         0.08,
                         scores[key]
                     )
 
-                    # stronger separation
                     weighted[key] = (
+
                         self.base_weights[key]
+
                         *
+
                         (
                             0.30
                             +
@@ -1716,7 +1777,6 @@ class EnsembleEngine:
                         ** 2
                     )
 
-                # Equation receives fixed small weight
                 weighted["Eq"] = (
                     self.base_weights["Eq"]
                     * 0.35
@@ -1726,7 +1786,7 @@ class EnsembleEngine:
                     weighted.values()
                 )
 
-                norm_weights = {
+                W = {
 
                     key:
                     value / total
@@ -1736,12 +1796,18 @@ class EnsembleEngine:
                 }
 
                 bt_msg = (
+
                     f"Backtest TOP-3 "
-                    f"{steps_run} งวด | "
+                    f"{steps} งวด | "
+
                     f"AI {scores['AI']:.0%} | "
+
                     f"Freq {scores['Freq']:.0%} | "
+
                     f"ST {scores['ST']:.0%} | "
+
                     f"Cal {scores['Cal']:.0%} | "
+
                     f"Pattern {scores['BT']:.0%}"
                 )
 
@@ -1749,44 +1815,54 @@ class EnsembleEngine:
         # CURRENT PREDICTION
         # ====================================================
 
-        p_ai = self.ai_sys.analyze(
-            X_all,
-            df_hist[pos],
-            next_x
+        p_ai = (
+            self.ai_sys.analyze(
+                X_all,
+                df_hist[pos],
+                next_x
+            )
         )
 
-        p_fq = self.freq_sys.analyze(
-            df_hist,
-            pos
+        p_fq = (
+            self.freq_sys.analyze(
+                df_hist,
+                pos
+            )
         )
 
-        p_cal = self.cond_sys.analyze(
-            df_hist,
-            pos,
-            next_date
+        p_cal = (
+            self.cond_sys.analyze(
+                df_hist,
+                pos,
+                next_date
+            )
         )
 
-        p_st = self.st_sys.analyze(
-            df_hist,
-            pos
+        p_st = (
+            self.st_sys.analyze(
+                df_hist,
+                pos
+            )
         )
 
-        p_bt = self.ptn_sys.analyze(
-            df_hist,
-            pos
+        p_bt = (
+            self.ptn_sys.analyze(
+                df_hist,
+                pos
+            )
         )
 
-        p_eq = self.pos_sys.analyze(
-            df_hist
+        p_eq = (
+            self.pos_sys.analyze(
+                df_hist
+            )
         )
-
-        W = norm_weights
 
         # ----------------------------------------------------
-        # Final Ensemble
+        # FINAL ENSEMBLE
         # ----------------------------------------------------
 
-        final_score = (
+        final = (
 
             W["AI"] * p_ai
 
@@ -1796,11 +1872,11 @@ class EnsembleEngine:
 
             +
 
-            W["Cal"] * p_cal
+            W["ST"] * p_st
 
             +
 
-            W["ST"] * p_st
+            W["Cal"] * p_cal
 
             +
 
@@ -1812,57 +1888,86 @@ class EnsembleEngine:
         )
 
         total = (
-            final_score.sum()
+            final.sum()
         )
 
         if total <= 0:
 
-            final_score = (
+            final = (
                 np.ones(10) / 10
             )
 
         else:
 
-            final_score = (
-                final_score /
-                total
+            final /= total
+
+        # ----------------------------------------------------
+        # TOP-3
+        # ----------------------------------------------------
+
+        top3_idx = (
+            np.argsort(
+                final
+            )[::-1][:3]
+        )
+
+        top3 = [
+
+            (
+                int(i),
+                float(final[i])
             )
 
-        # ====================================================
-        # TOP-3
-        # ====================================================
+            for i in top3_idx
+        ]
 
-        def get_top3(probs):
-
-            idx = np.argsort(
-                probs
+        ai_idx = (
+            np.argsort(
+                p_ai
             )[::-1][:3]
+        )
 
-            return [
-                (
-                    int(i),
-                    float(probs[i])
-                )
-                for i in idx
-            ]
+        ai_top3 = [
 
-        # ====================================================
-        # DEAD TOP-7
-        # ====================================================
+            (
+                int(i),
+                float(p_ai[i])
+            )
 
-        def get_dead7(probs):
+            for i in ai_idx
+        ]
 
-            idx = np.argsort(
-                probs
-            )[:7]
+        freq_idx = (
+            np.argsort(
+                p_fq
+            )[::-1][:3]
+        )
 
-            return [
-                (
-                    int(i),
-                    float(probs[i])
-                )
-                for i in idx
-            ]
+        freq_top3 = [
+
+            (
+                int(i),
+                float(p_fq[i])
+            )
+
+            for i in freq_idx
+        ]
+
+        cal_idx = (
+            np.argsort(
+                p_cal
+            )[::-1][:3]
+        )
+
+        cal_top3 = [
+
+            (
+                int(i),
+                float(p_cal[i])
+            )
+
+            for i in cal_idx
+        ]
 
         return (
 
@@ -1870,26 +1975,23 @@ class EnsembleEngine:
 
             {
 
-                "AI":
-                    get_top3(p_ai),
+                "Final":
+                    top3,
 
-                "Calendar":
-                    get_top3(p_cal),
+                "AI":
+                    ai_top3,
 
                 "Frequency":
-                    get_top3(p_fq),
+                    freq_top3,
 
-                "Final":
-                    get_top3(final_score),
+                "Calendar":
+                    cal_top3,
 
-                "Dead":
-                    get_dead7(final_score),
-
-                "Probs_For_Graph":
-                    final_score,
+                "Probs":
+                    final,
 
                 "Weights":
-                    norm_weights,
+                    W,
 
                 "BT_Msg":
                     bt_msg
@@ -1909,7 +2011,7 @@ class EnsembleEngine:
         )
 
         # ----------------------------------------------------
-        # Target date
+        # NEXT DATE
         # ----------------------------------------------------
 
         if self.target_dow is not None:
@@ -1921,6 +2023,7 @@ class EnsembleEngine:
             )
 
             if days_ahead <= 0:
+
                 days_ahead += 7
 
             next_date = (
@@ -1937,17 +2040,21 @@ class EnsembleEngine:
                 self.df_raw
             ) <= 1:
 
-                gap_days = 7
+                gap = 7
 
             else:
 
-                gap_days = max(
+                gap = max(
+
                     1,
+
                     (
                         self.df_raw[
                             "Date"
                         ].iloc[-1]
+
                         -
+
                         self.df_raw[
                             "Date"
                         ].iloc[-2]
@@ -1958,19 +2065,25 @@ class EnsembleEngine:
                 last_date
                 +
                 timedelta(
-                    days=gap_days
+                    days=gap
                 )
             )
 
         # ----------------------------------------------------
-        # Dummy next row
+        # EXTEND ONE FUTURE ROW
         # ----------------------------------------------------
 
         dummy = pd.DataFrame([
+
             {
-                "Date": next_date,
-                "Result_3D": "000",
-                "Result_2D": "00"
+                "Date":
+                    next_date,
+
+                "Result_3D":
+                    "000",
+
+                "Result_2D":
+                    "00"
             }
         ])
 
@@ -1988,10 +2101,11 @@ class EnsembleEngine:
             self.rolls
         )
 
-        # IMPORTANT:
-        # Dummy result is removed before training.
+        # CRITICAL:
+        # Future result is never trained
         df_hist = (
-            df_ext.iloc[:-1]
+            df_ext
+            .iloc[:-1]
             .copy()
         )
 
@@ -2003,9 +2117,9 @@ class EnsembleEngine:
         )
 
         next_x = (
-            df_ext.iloc[
-                [-1]
-            ][
+            df_ext
+            .iloc[[-1]]
+            [
                 self.features
             ]
             .copy()
@@ -2022,7 +2136,7 @@ class EnsembleEngine:
         ]:
 
             results.append(
-                self._process_single_position(
+                self.process_position(
                     pos,
                     df_hist,
                     X_all,
@@ -2032,11 +2146,13 @@ class EnsembleEngine:
             )
 
         return (
+
             {
                 pos: data
                 for pos, data
                 in results
             },
+
             next_date
         )
 
@@ -2045,25 +2161,25 @@ class EnsembleEngine:
 # 12. HELPER
 # ============================================================
 
-def format_nums(items):
+def nums_only(items):
 
     return " • ".join(
-        str(num)
-        for num, prob
-        in items
+        str(n)
+        for n, p in items
     )
 
 
-def format_nums_prob(items):
+def nums_with_prob(items):
 
     return " | ".join(
-        f"{num} ({prob:.1%})"
-        for num, prob
-        in items
+
+        f"{n} = {p:.1%}"
+
+        for n, p in items
     )
 
 
-def get_hot3_from_positions(
+def combined_top3(
     preds,
     positions
 ):
@@ -2073,58 +2189,32 @@ def get_hot3_from_positions(
     for pos in positions:
 
         score += (
-            preds[pos][
-                "Probs_For_Graph"
-            ]
+            preds[pos]["Probs"]
         )
 
-    score /= len(positions)
+    score /= len(
+        positions
+    )
 
-    idx = np.argsort(
-        score
-    )[::-1][:3]
+    idx = (
+        np.argsort(
+            score
+        )[::-1][:3]
+    )
 
     return [
+
         (
             int(i),
             float(score[i])
         )
-        for i in idx
-    ]
 
-
-def get_dead7_from_positions(
-    preds,
-    positions
-):
-
-    score = np.zeros(10)
-
-    for pos in positions:
-
-        score += (
-            preds[pos][
-                "Probs_For_Graph"
-            ]
-        )
-
-    score /= len(positions)
-
-    idx = np.argsort(
-        score
-    )[:7]
-
-    return [
-        (
-            int(i),
-            float(score[i])
-        )
         for i in idx
     ]
 
 
 # ============================================================
-# 13. UI HEADER
+# 13. HEADER
 # ============================================================
 
 st.markdown(
@@ -2136,8 +2226,9 @@ st.markdown(
 
 st.markdown(
     '<div class="sub-title">'
-    'Sequential Draw-to-Draw • TOP-3 Optimized '
-    '• Time-Decay • Dynamic Ensemble'
+    'Sequential Draw-to-Draw • '
+    'TOP-3 Optimized • '
+    'Time-Decay • Dynamic Ensemble'
     '</div>',
     unsafe_allow_html=True
 )
@@ -2146,19 +2237,21 @@ st.divider()
 
 
 # ============================================================
-# 14. CONTROL
+# 14. SELECT
 # ============================================================
 
 col1, col2 = st.columns(2)
 
 with col1:
 
-    selected_lotto = st.selectbox(
-        "🎯 เลือกหวย",
-        list(
-            LOTTERY_SOURCES.keys()
-        ),
-        index=0
+    selected_lotto = (
+        st.selectbox(
+            "🎯 เลือกหวย",
+            list(
+                LOTTERY_SOURCES.keys()
+            ),
+            index=0
+        )
     )
 
 with col2:
@@ -2190,7 +2283,7 @@ with col2:
             6
     }
 
-    selected_day_label = (
+    selected_day = (
         st.selectbox(
             "📅 วันออกรางวัล",
             list(
@@ -2201,25 +2294,23 @@ with col2:
 
     target_dow = (
         day_options[
-            selected_day_label
+            selected_day
         ]
     )
 
 
 # ============================================================
-# 15. RUN
+# 15. RUN BUTTON
 # ============================================================
 
 if st.button(
-    "🚀 วิเคราะห์ TOP-3",
+    "🚀 วิเคราะห์เลขเด่น TOP-3",
     type="primary",
     use_container_width=True
 ):
 
     with st.spinner(
-        "⏳ กำลังดึงข้อมูล + "
-        "Walk-Forward Backtest + "
-        "AI Ensemble..."
+        "⏳ กำลังคำนวณใหม่..."
     ):
 
         url = (
@@ -2237,43 +2328,37 @@ if st.button(
         if df_raw.empty:
             st.stop()
 
-        # ----------------------------------------------------
-        # Engine
-        # ----------------------------------------------------
-
         engine = EnsembleEngine(
             df_raw,
             selected_lotto,
-            target_dow=target_dow
+            target_dow
         )
 
         # ----------------------------------------------------
-        # System status
+        # STATUS
         # ----------------------------------------------------
-
-        st.success(
-            f"✅ โหลดข้อมูลสำเร็จ "
-            f"{len(df_raw):,} งวด"
-        )
 
         c1, c2, c3 = st.columns(3)
 
         with c1:
+
             st.metric(
-                "📚 ข้อมูล",
+                "📚 งวด",
                 f"{len(df_raw):,}"
             )
 
         with c2:
+
             st.metric(
-                "🤖 AI Trees",
+                "🤖 Trees",
                 engine.trees
             )
 
         with c3:
+
             st.metric(
-                "🎯 Output",
-                "TOP-3"
+                "🎯 TOP",
+                "3"
             )
 
         st.caption(
@@ -2281,7 +2366,7 @@ if st.button(
         )
 
         # ----------------------------------------------------
-        # Prediction
+        # PREDICT
         # ----------------------------------------------------
 
         preds, next_date = (
@@ -2289,6 +2374,7 @@ if st.button(
         )
 
         dow_names = [
+
             "จันทร์",
             "อังคาร",
             "พุธ",
@@ -2329,7 +2415,7 @@ if st.button(
         )
 
         # ====================================================
-        # POSITION RESULTS
+        # EACH POSITION
         # ====================================================
 
         for pos in [
@@ -2340,24 +2426,20 @@ if st.button(
             "O2"
         ]:
 
-            final_top3 = (
+            final = (
                 preds[pos]["Final"]
             )
 
-            ai_top3 = (
+            ai = (
                 preds[pos]["AI"]
             )
 
-            cal_top3 = (
-                preds[pos]["Calendar"]
-            )
-
-            stat_top3 = (
+            freq = (
                 preds[pos]["Frequency"]
             )
 
-            dead7 = (
-                preds[pos]["Dead"]
+            cal = (
+                preds[pos]["Calendar"]
             )
 
             W = (
@@ -2369,20 +2451,24 @@ if st.button(
             )
 
             # ------------------------------------------------
-            # Final TOP 3
+            # HOT TOP 3
             # ------------------------------------------------
 
-            st.success(
-                f"🔥 **HOT TOP-3:**  "
-                f"`{format_nums(final_top3)}`"
-            )
+            st.markdown(
 
-            st.caption(
-                "ความน่าจะเป็น Ensemble: "
-                +
-                format_nums_prob(
-                    final_top3
-                )
+                '<div class="hot-box">'
+                '<div>'
+                '🔥 <b>HOT TOP-3</b>'
+                '</div>'
+                f'<div class="big-number">'
+                f'{nums_only(final)}'
+                '</div>'
+                f'<div class="prob-number">'
+                f'{nums_with_prob(final)}'
+                '</div>'
+                '</div>',
+
+                unsafe_allow_html=True
             )
 
             # ------------------------------------------------
@@ -2391,34 +2477,29 @@ if st.button(
 
             st.markdown(
                 f"🤖 **AI TOP-3:** "
-                f"`{format_nums(ai_top3)}`"
+                f"`{nums_only(ai)}`"
             )
 
             # ------------------------------------------------
-            # Other systems
+            # FREQUENCY
             # ------------------------------------------------
 
             st.markdown(
                 f"📊 **สถิติ TOP-3:** "
-                f"`{format_nums(stat_top3)}`"
+                f"`{nums_only(freq)}`"
             )
+
+            # ------------------------------------------------
+            # CALENDAR
+            # ------------------------------------------------
 
             st.markdown(
                 f"📅 **กำลังวัน TOP-3:** "
-                f"`{format_nums(cal_top3)}`"
+                f"`{nums_only(cal)}`"
             )
 
             # ------------------------------------------------
-            # Dead
-            # ------------------------------------------------
-
-            st.warning(
-                f"❄️ **DEAD TOP-7:** "
-                f"`{format_nums(dead7)}`"
-            )
-
-            # ------------------------------------------------
-            # Backtest
+            # BACKTEST
             # ------------------------------------------------
 
             st.caption(
@@ -2427,8 +2508,13 @@ if st.button(
                 preds[pos]["BT_Msg"]
             )
 
+            # ------------------------------------------------
+            # WEIGHTS
+            # ------------------------------------------------
+
             st.caption(
-                "⚖️ Weight → "
+
+                "⚖️ "
                 f"AI {W['AI']:.0%} | "
                 f"Freq {W['Freq']:.0%} | "
                 f"ST {W['ST']:.0%} | "
@@ -2440,11 +2526,11 @@ if st.button(
             st.divider()
 
         # ====================================================
-        # HOT TOP 3 SUMMARY
+        # FINAL HOT SUMMARY
         # ====================================================
 
         hot_top3 = (
-            get_hot3_from_positions(
+            combined_top3(
                 preds,
                 [
                     "H",
@@ -2455,7 +2541,7 @@ if st.button(
         )
 
         hot_bottom3 = (
-            get_hot3_from_positions(
+            combined_top3(
                 preds,
                 [
                     "T2",
@@ -2463,81 +2549,42 @@ if st.button(
                 ]
             )
         )
-
-        dead_top7 = (
-            get_dead7_from_positions(
-                preds,
-                [
-                    "H",
-                    "T",
-                    "O"
-                ]
-            )
-        )
-
-        dead_bottom7 = (
-            get_dead7_from_positions(
-                preds,
-                [
-                    "T2",
-                    "O2"
-                ]
-            )
-        )
-
-        # ====================================================
-        # SUMMARY
-        # ====================================================
 
         st.subheader(
-            "🔥 สรุปฟันธง"
+            "🔥 สรุปเลขเด่น"
         )
 
         st.markdown(
+
             '<div class="hot-box">'
-            '<div class="small-label">'
-            '🔥 HOT TOP-3 เด่นบนรวม'
+            '<div>'
+            '🔥 <b>HOT TOP-3 บนรวม</b>'
             '</div>'
             f'<div class="big-number">'
-            f'{format_nums(hot_top3)}'
+            f'{nums_only(hot_top3)}'
+            '</div>'
+            f'<div class="prob-number">'
+            f'{nums_with_prob(hot_top3)}'
             '</div>'
             '</div>',
+
             unsafe_allow_html=True
         )
 
         st.markdown(
+
             '<div class="hot-box">'
-            '<div class="small-label">'
-            '🔥 HOT TOP-3 เด่นล่างรวม'
+            '<div>'
+            '🔥 <b>HOT TOP-3 ล่างรวม</b>'
             '</div>'
             f'<div class="big-number">'
-            f'{format_nums(hot_bottom3)}'
+            f'{nums_only(hot_bottom3)}'
+            '</div>'
+            f'<div class="prob-number">'
+            f'{nums_with_prob(hot_bottom3)}'
             '</div>'
             '</div>',
-            unsafe_allow_html=True
-        )
 
-        st.markdown(
-            '<div class="dead-box">'
-            '<div class="small-label">'
-            '❄️ DEAD TOP-7 บน'
-            '</div>'
-            f'<div class="big-number">'
-            f'{format_nums(dead_top7)}'
-            '</div>'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            '<div class="dead-box">'
-            '<div class="small-label">'
-            '❄️ DEAD TOP-7 ล่าง'
-            '</div>'
-            f'<div class="big-number">'
-            f'{format_nums(dead_bottom7)}'
-            '</div>'
-            '</div>',
             unsafe_allow_html=True
         )
 
@@ -2601,17 +2648,15 @@ if st.button(
                 "%"
             )
 
-            max_prob = (
-                max(
-                    probabilities
-                )
+            max_value = (
+                max(probabilities)
                 if probabilities
                 else 1
             )
 
             ax.set_ylim(
                 0,
-                max_prob * 1.30
+                max_value * 1.30
             )
 
             for i, value in enumerate(
@@ -2641,26 +2686,25 @@ if st.button(
         plt.close(fig)
 
         # ====================================================
-        # DATA INFO
+        # FOOTER
         # ====================================================
 
         st.divider()
 
         st.caption(
-            "🛡️ ระบบใช้ Strict Walk-Forward "
-            "Backtest และไม่ใช้ผลของงวดเป้าหมาย "
-            "ในการฝึกโมเดล"
+            "🛡️ Strict Walk-Forward • "
+            "Leakage Safe • "
+            "ไม่มีการใช้ผลของงวดเป้าหมายฝึกโมเดล"
         )
 
         st.caption(
-            "🔄 เมื่อกดวิเคราะห์ ระบบจะคำนวณ "
-            "ใหม่จากข้อมูลล่าสุด"
+            "🔄 กดวิเคราะห์แต่ละครั้ง "
+            "ระบบจะคำนวณจากข้อมูลล่าสุดใหม่"
         )
 
         if not XGB_AVAILABLE:
 
-            st.warning(
-                "ℹ️ ไม่พบ XGBoost — ระบบใช้ "
-                "RandomForest + ExtraTrees + "
-                "HistGradientBoosting แทน"
-                        )
+            st.caption(
+                "ℹ️ ไม่พบ XGBoost → "
+                "ใช้ RF + ExtraTrees + HGB"
+            )
