@@ -1,8 +1,8 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V6.0 QUANTUM OMEGA
-# ADVANCED CAUSAL • LEAKAGE SAFE • EXPONENTIAL PENALTY WALK-FORWARD
+# 🛑 LOTTO AI PRO V7.0 NEURAL SINGULARITY
+# CONSENSUS VARIANCE PENALTY • MTBO Z-SCORE • EXPONENTIAL WF
 # CANDIDATE ELIMINATION TOP-7
-# RANDOM FOREST + EXTRA TREES + HIST GRADIENT BOOSTING + ADVANCED STATS
+# ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION
 # ==============================================================================
 
 import streamlit as st
@@ -19,6 +19,9 @@ from sklearn.ensemble import (
     ExtraTreesClassifier,
     HistGradientBoostingClassifier
 )
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
 
 warnings.filterwarnings("ignore")
 
@@ -27,7 +30,7 @@ warnings.filterwarnings("ignore")
 # ==============================================================================
 
 st.set_page_config(
-    page_title="ระบบวิเคราะห์เลขดับ PRO V6.0 QUANTUM OMEGA",
+    page_title="ระบบวิเคราะห์เลขดับ PRO V7.0 SINGULARITY",
     page_icon="🛑",
     layout="centered"
 )
@@ -36,57 +39,71 @@ st.markdown("""
 <style>
 .main-title {
     text-align:center;
-    font-size:31px;
+    font-size:32px;
     font-weight:900;
-    color:#311B92;
+    background: -webkit-linear-gradient(45deg, #000000, #B71C1C, #4A148C);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     margin-bottom:5px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
 }
 .sub-title {
     text-align:center;
     color:#555;
     font-size:14px;
     margin-bottom:20px;
+    font-weight: bold;
 }
 .dead-card {
-    background:linear-gradient(135deg, #ffffff, #F3E5F5);
-    border-left:6px solid #6A1B9A;
-    padding:18px;
+    background:linear-gradient(135deg, #ffffff, #fafafa);
+    border-left:7px solid #111;
+    padding:20px;
     border-radius:12px;
     margin-bottom:18px;
-    box-shadow:0 4px 12px rgba(0,0,0,.1);
+    box-shadow:0 6px 15px rgba(0,0,0,.08);
 }
 .position-title {
-    font-size:19px;
-    font-weight:800;
-    color:#333;
-    border-bottom:2px solid #E1BEE7;
+    font-size:20px;
+    font-weight:900;
+    color:#222;
+    border-bottom:2px solid #ddd;
     padding-bottom:7px;
-    margin-bottom:10px;
+    margin-bottom:12px;
 }
 .dead-number-highlight {
-    font-size:30px;
+    font-size:34px;
     font-weight:900;
-    color:#4A148C;
-    letter-spacing:4px;
+    color:#B71C1C;
+    letter-spacing:6px;
     text-align:center;
-    margin:10px 0;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    margin:15px 0;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
 .info-row {
-    margin:7px 0;
-    font-size:13px;
+    margin:8px 0;
+    font-size:14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .badge {
-    padding:4px 10px;
-    border-radius:15px;
-    font-size:13px;
-    font-weight:700;
+    padding:5px 12px;
+    border-radius:20px;
+    font-size:14px;
+    font-weight:800;
+    letter-spacing: 2px;
 }
 .badge-ai { background:#E3F2FD; color:#1565C0; }
 .badge-stat { background:#E8F5E9; color:#2E7D32; }
 .badge-day { background:#FFF3E0; color:#E65100; }
+.metric-box {
+    font-size: 12px;
+    color: #666;
+    background: #f1f1f1;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -133,8 +150,7 @@ def fetch_data(lotto_name):
             top = str(prize1).zfill(3)
             bot = str(bottom2).zfill(2)
             data.append({
-                "date": date_str,
-                "draw_num": top,
+                "date": date_str, "draw_num": top,
                 "hundred": int(top[0]), "ten": int(top[1]), "unit": int(top[2]),
                 "bot_ten": int(bot[0]), "bot_unit": int(bot[1])
             })
@@ -148,18 +164,18 @@ def fetch_data(lotto_name):
         return None
 
 # ==============================================================================
-# 3. ADAPTIVE CONFIG (Tuned for V6.0)
+# 3. ADAPTIVE CONFIG
 # ==============================================================================
 
 def get_adaptive_config(n):
     if n >= 700:
-        return {"mode": "QUANTUM 700+", "trees": 120, "max_depth": 8, "leaf": 2, "bt_steps": 12, "min_train": 50, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 15]}
+        return {"mode": "SINGULARITY 700+", "trees": 150, "max_depth": 8, "bt_steps": 15, "min_train": 60, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 20]}
     elif n >= 400:
-        return {"mode": "QUANTUM 400-699", "trees": 90, "max_depth": 7, "leaf": 2, "bt_steps": 10, "min_train": 45, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10]}
+        return {"mode": "SINGULARITY 400-699", "trees": 100, "max_depth": 7, "bt_steps": 12, "min_train": 50, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10, 15]}
     elif n >= 200:
-        return {"mode": "OMEGA 200-399", "trees": 70, "max_depth": 6, "leaf": 2, "bt_steps": 8, "min_train": 40, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10]}
+        return {"mode": "NEURAL 200-399", "trees": 80, "max_depth": 6, "bt_steps": 10, "min_train": 40, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10]}
     else:
-        return {"mode": "OMEGA 30-199", "trees": 50, "max_depth": 5, "leaf": 2, "bt_steps": 6, "min_train": 30, "lags": [1, 2, 3], "rolls": [3, 5]}
+        return {"mode": "NEURAL 30-199", "trees": 50, "max_depth": 5, "bt_steps": 7, "min_train": 30, "lags": [1, 2, 3], "rolls": [3, 5]}
 
 # ==============================================================================
 # 4. ADVANCED CAUSAL FEATURE ENGINEERING
@@ -170,75 +186,55 @@ def build_features_cached(df, target_col, lags, rolls):
     x = df.copy()
     target = pd.to_numeric(x[target_col], errors="coerce")
     
-    # --------------------------------------------------------------------------
-    # Previous value ONLY (Strict Causal)
-    # --------------------------------------------------------------------------
     prev = target.shift(1)
     x["prev_val"] = prev
     x["prev_even"] = (prev % 2 == 0).astype(np.float32)
     x["prev_high"] = (prev >= 5).astype(np.float32)
     x["mirror"] = (prev + 5) % 10
     
-    # Advanced math features
     primes = [2, 3, 5, 7]
     x["prev_prime"] = prev.isin(primes).astype(np.float32)
     x["prev_mod3"] = prev % 3
-    x["prev_mod4"] = prev % 4
     
-    # Time features
+    # Cyclical Time
     dt = x["date"].dt
     weekday = dt.weekday.astype(float)
     x["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
     x["weekday_cos"] = np.cos(2 * np.pi * weekday / 7)
     
-    # Lags
-    for lag in lags:
-        x[f"lag_{lag}"] = target.shift(lag)
+    for lag in lags: x[f"lag_{lag}"] = target.shift(lag)
         
-    # Distance / Momentum
     x["diff_1"] = (prev - target.shift(2)).abs()
-    x["diff_2"] = (target.shift(2) - target.shift(3)).abs()
-        
-    # Rolling features & EMA (Exponential Moving Average)
+    
     shifted = target.shift(1)
     for w in rolls:
         x[f"roll_mean_{w}"] = shifted.rolling(w, min_periods=1).mean()
         x[f"roll_std_{w}"] = shifted.rolling(w, min_periods=1).std().fillna(0)
-        x[f"roll_max_{w}"] = shifted.rolling(w, min_periods=1).max()
         x[f"ema_{w}"] = shifted.ewm(span=w, adjust=False).mean()
 
-    # Skip tracking (Causal - calculate only from history)
-    prev_arr = target.shift(1).to_numpy()
+    # Skip tracking
+    prev_arr = shifted.to_numpy()
     n = len(prev_arr)
     idx = np.arange(n)
     
     for d in range(10):
         hit = np.where(np.isfinite(prev_arr) & (prev_arr == d), idx, -1)
         last_seen = np.maximum.accumulate(hit)
-        skip = np.where(last_seen >= 0, idx - last_seen, 50)
-        x[f"skip_{d}"] = np.clip(skip, 0, 50)
+        skip = np.where(last_seen >= 0, idx - last_seen, 60)
+        x[f"skip_{d}"] = np.clip(skip, 0, 60)
 
-    # Clean data
-    x = x.replace([np.inf, -np.inf], np.nan)
-    x = x.fillna(-1)
+    x = x.replace([np.inf, -np.inf], np.nan).fillna(-1)
     return x
 
 # ==============================================================================
-# 5. PROBABILITY NORMALIZER & TEMPERATURE SCALING
+# 5. PROBABILITY NORMALIZER & SCALING
 # ==============================================================================
 
-def normalize_probs(p, temperature=1.1):
-    """
-    Temperature Scaling > 1 ทำให้กราฟความน่าจะเป็นแบนลงเล็กน้อย 
-    เพื่อป้องกัน AI มั่นใจเกินไป (Overconfidence) ในการหาเลขดับ
-    """
+def normalize_probs(p, temperature=1.0):
     p = np.asarray(p, dtype=float)
     p[~np.isfinite(p)] = 0
-    p = np.maximum(p, 1e-6) # Prevent absolute zero
-    
-    # Apply temperature
+    p = np.maximum(p, 1e-6)
     p = np.power(p, 1 / temperature)
-    
     total = p.sum()
     if total <= 0: return np.ones(10) / 10
     return p / total
@@ -255,50 +251,51 @@ def model_probs(model, X):
         return np.ones(10) / 10
 
 # ==============================================================================
-# 6. ENHANCED STATISTICAL SYSTEM
+# 6. SINGULARITY STATISTICAL SYSTEM (MTBO Z-SCORE)
 # ==============================================================================
 
-class AdvancedStatSystem:
+class SingularityStatSystem:
     
     @staticmethod
     def markov_blend(seq):
         seq = np.asarray(seq, dtype=int)
         if len(seq) < 15: return np.ones(10) / 10
         last = int(seq[-1])
-        
-        # Order-1 Markov
         mask = seq[:-1] == last
         next_values = seq[1:][mask]
         counts = np.bincount(next_values, minlength=10).astype(float)
-        counts += 1.0 # Strong Laplace smoothing for safety
-        
+        counts += 0.8 # Smoothing
         return normalize_probs(counts)
 
     @staticmethod
-    def frequency_skip(seq):
+    def mtbo_skip(seq):
+        """Mean Time Between Occurrences (MTBO) Z-Score"""
         seq = np.asarray(seq, dtype=int)
         n = len(seq)
         if n == 0: return np.ones(10) / 10
         
-        recent_30 = seq[-30:] if n >= 30 else seq
-        recent_10 = seq[-10:] if n >= 10 else seq
-        
         result = np.zeros(10)
         for d in range(10):
-            freq_all = np.mean(seq == d)
-            freq_30 = np.mean(recent_30 == d)
-            freq_10 = np.mean(recent_10 == d)
-            
             pos = np.where(seq == d)[0]
-            skip = n - pos[-1] - 1 if len(pos) else 50
+            if len(pos) > 1:
+                gaps = np.diff(pos)
+                avg_gap = np.mean(gaps)
+                std_gap = np.std(gaps) + 0.1
+            else:
+                avg_gap, std_gap = 10.0, 5.0
+                
+            current_gap = n - pos[-1] - 1 if len(pos) else 60
             
-            # Weighted Frequency
-            freq_score = (0.2 * freq_all) + (0.4 * freq_30) + (0.4 * freq_10)
+            # คำนวณ Z-Score ถ้า current_gap ต่ำกว่า avg_gap มากๆ แปลว่าเพิ่งออก โอกาสดับสูง (ค่า z ติดลบ)
+            z = (current_gap - avg_gap) / std_gap
             
-            # Exponential decay for skip (เลขที่หายนานๆ โอกาสดับจะลดลงเรื่อยๆ แบบโค้ง)
-            skip_score = np.exp(-skip / 8.0) 
+            # ผสมผสานกับ Frequency พื้นฐาน
+            freq = np.mean(seq == d)
             
-            result[d] = (0.65 * freq_score) + (0.35 * skip_score)
+            # Sigmoid mapping สำหรับ Z-score
+            prob_z = 1 / (1 + np.exp(-z))
+            
+            result[d] = (0.7 * prob_z) + (0.3 * freq)
             
         return normalize_probs(result)
 
@@ -307,16 +304,15 @@ class AdvancedStatSystem:
         mask = (df["date"].dt.weekday == target_dow)
         values = df.loc[mask, target_col].astype(int).to_numpy()
         if len(values) < 5: return np.ones(10) / 10
-        
         counts = np.bincount(values, minlength=10).astype(float)
-        counts += 1.5 # Heavy smoothing for days (often sparse)
+        counts += 1.0 
         return normalize_probs(counts)
 
 # ==============================================================================
-# 7. AI ENGINE
+# 7. NEURAL SINGULARITY AI ENGINE
 # ==============================================================================
 
-class QuantumAI:
+class SingularityAI:
     def __init__(self, df, target_col):
         self.df = df
         self.target_col = target_col
@@ -325,42 +321,21 @@ class QuantumAI:
         
         self.trees = self.cfg["trees"]
         self.depth = self.cfg["max_depth"]
-        self.leaf = self.cfg["leaf"]
         self.lags = self.cfg["lags"]
         self.rolls = self.cfg["rolls"]
         
-        # Enhanced Ensembles
         self.models = {
-            "ET": ExtraTreesClassifier(
-                n_estimators=self.trees,
-                max_depth=self.depth,
-                min_samples_leaf=self.leaf,
-                max_features="sqrt",
-                class_weight="balanced",
-                random_state=42,
-                n_jobs=-1
+            "LR": make_pipeline(
+                StandardScaler(), 
+                LogisticRegression(max_iter=300, class_weight='balanced', C=0.5, random_state=42)
             ),
-            "RF": RandomForestClassifier(
-                n_estimators=self.trees,
-                max_depth=self.depth,
-                min_samples_leaf=self.leaf,
-                max_features="log2",
-                class_weight="balanced",
-                random_state=43,
-                n_jobs=-1
-            ),
-            "HGB": HistGradientBoostingClassifier(
-                max_iter=60,
-                max_depth=min(6, self.depth),
-                learning_rate=0.05,
-                min_samples_leaf=max(4, self.leaf),
-                l2_regularization=0.5, # Stronger penalty for outliners
-                random_state=44
-            )
+            "ET": ExtraTreesClassifier(n_estimators=self.trees, max_depth=self.depth, min_samples_leaf=2, max_features="sqrt", class_weight="balanced", random_state=43, n_jobs=-1),
+            "RF": RandomForestClassifier(n_estimators=self.trees, max_depth=self.depth, min_samples_leaf=2, max_features="log2", class_weight="balanced", random_state=44, n_jobs=-1),
+            "HGB": HistGradientBoostingClassifier(max_iter=70, max_depth=min(6, self.depth), learning_rate=0.04, min_samples_leaf=3, l2_regularization=1.0, random_state=45)
         }
 
     def train_predict(self, X_train, y_train, X_predict, weights=None):
-        if weights is None: weights = {"ET": 0.40, "RF": 0.35, "HGB": 0.25}
+        if weights is None: weights = {"LR": 0.20, "ET": 0.30, "RF": 0.30, "HGB": 0.20}
         result = np.zeros(10)
         total = 0.0
         
@@ -368,9 +343,11 @@ class QuantumAI:
             w = float(weights.get(name, 0))
             if w <= 0: continue
             try:
-                model = type(base)(**base.get_params())
-                model.fit(X_train, y_train)
-                p = model_probs(model, X_predict)
+                model = base # For pipeline, we just use it directly (it clones internally inside cross_val, but here we fit directly)
+                from sklearn.base import clone
+                model_clone = clone(base)
+                model_clone.fit(X_train, y_train)
+                p = model_probs(model_clone, X_predict)
                 result += p * w
                 total += w
             except Exception:
@@ -381,20 +358,13 @@ class QuantumAI:
 
     def walk_forward(self, X, y, df):
         n = len(X)
-        min_train = self.cfg["min_train"]
-        steps = self.cfg["bt_steps"]
-        
-        if n <= min_train + 2:
-            return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
+        min_train, steps = self.cfg["min_train"], self.cfg["bt_steps"]
+        if n <= min_train + 2: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
             
         start = max(min_train, n - steps)
         indices = np.arange(start, n)
         
-        # Better proxy model for backtest
-        proxy = RandomForestClassifier(
-            n_estimators=30, max_depth=5, min_samples_leaf=3,
-            class_weight="balanced", random_state=99, n_jobs=-1
-        )
+        proxy = ExtraTreesClassifier(n_estimators=30, max_depth=5, min_samples_leaf=3, random_state=99, n_jobs=-1)
         
         ai_hits, stat_hits, day_hits, count = 0, 0, 0, 0
         values = y.to_numpy(dtype=int)
@@ -403,23 +373,19 @@ class QuantumAI:
             X_train, y_train = X.iloc[:i], y.iloc[:i]
             actual = int(y.iloc[i])
             
-            # AI Check
             try:
                 proxy.fit(X_train, y_train)
                 p_ai = model_probs(proxy, X.iloc[[i]])
                 if actual in np.argsort(p_ai)[:7]: ai_hits += 1
             except: pass
             
-            # Stat Check
             hist = values[:i]
-            p_stat = normalize_probs(0.5 * AdvancedStatSystem.markov_blend(hist) + 0.5 * AdvancedStatSystem.frequency_skip(hist))
+            p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(hist) + 0.6 * SingularityStatSystem.mtbo_skip(hist))
             if actual in np.argsort(p_stat)[:7]: stat_hits += 1
             
-            # Day Check
             target_day = int(df.iloc[i]["date"].weekday())
-            p_day = AdvancedStatSystem.day_probability(df.iloc[:i], self.target_col, target_day)
+            p_day = SingularityStatSystem.day_probability(df.iloc[:i], self.target_col, target_day)
             if actual in np.argsort(p_day)[:7]: day_hits += 1
-            
             count += 1
             
         if count == 0: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
@@ -428,7 +394,6 @@ class QuantumAI:
     def analyze(self, target_date, target_dow):
         if self.n < 30: return None
         
-        # Future Row (Safe from leakage)
         future = {"date": target_date, "draw_num": "000", "hundred": np.nan, "ten": np.nan, "unit": np.nan, "bot_ten": np.nan, "bot_unit": np.nan}
         extended = pd.concat([self.df, pd.DataFrame([future])], ignore_index=True)
         
@@ -439,47 +404,53 @@ class QuantumAI:
         X_predict = features.iloc[[-1]][X_all.columns]
         y_all = self.df[self.target_col].astype(int)
         
-        # Walk Forward
         bt = self.walk_forward(X_all, y_all, self.df)
         
-        # ----------------------------------------------------------------------
-        # Quadratic Penalty Weights (V6.0 OMEGA Feature)
-        # ลงโทษโมเดลที่มี hit rate ต่ำให้มีผลน้อยลงมากๆ แบบยกกำลังสอง
-        # ----------------------------------------------------------------------
-        base_ai, base_stat, base_day = 0.55, 0.30, 0.15
-        
+        # Exponential Penalty for Weights
+        base_ai, base_stat, base_day = 0.50, 0.35, 0.15
         if bt["steps"] > 0:
-            # ใช้กำลังสอง (squared) เพื่อขยายความต่างของความแม่นยำ
-            ai_score = max(0.01, bt["ai"] ** 2)
-            stat_score = max(0.01, bt["stat"] ** 2)
-            day_score = max(0.01, bt["day"] ** 2)
+            # ใช้ Exponential ยกกำลัง ถ้าทายถูกเยอะจะได้น้ำหนักพุ่ง ทายผิดน้ำหนักจม
+            ai_score = np.exp(5 * (bt["ai"] - 0.5))
+            stat_score = np.exp(5 * (bt["stat"] - 0.5))
+            day_score = np.exp(5 * (bt["day"] - 0.5))
             
-            wa = base_ai * ai_score
-            ws = base_stat * stat_score
-            wd = base_day * day_score
-            
-            total = wa + ws + wd
-            w_ai, w_stat, w_day = wa/total, ws/total, wd/total
+            total = (base_ai * ai_score) + (base_stat * stat_score) + (base_day * day_score)
+            w_ai = (base_ai * ai_score) / total
+            w_stat = (base_stat * stat_score) / total
+            w_day = (base_day * day_score) / total
         else:
             w_ai, w_stat, w_day = base_ai, base_stat, base_day
             
-        # Final Generation
         ai_probs = self.train_predict(X_all, y_all, X_predict)
         
         seq = y_all.to_numpy(dtype=int)
-        p_markov = AdvancedStatSystem.markov_blend(seq)
-        p_freq = AdvancedStatSystem.frequency_skip(seq)
-        stat_probs = normalize_probs((0.5 * p_markov) + (0.5 * p_freq))
+        p_stat = normalize_probs((0.4 * SingularityStatSystem.markov_blend(seq)) + (0.6 * SingularityStatSystem.mtbo_skip(seq)))
+        p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
         
-        day_probs = AdvancedStatSystem.day_probability(self.df, self.target_col, target_dow)
+        # ----------------------------------------------------------------------
+        # CONSENSUS VARIANCE PENALTY (V7.0 CORE)
+        # ----------------------------------------------------------------------
+        # 1. หาค่าเฉลี่ยถ่วงน้ำหนัก
+        mean_probs = (w_ai * ai_probs) + (w_stat * p_stat) + (w_day * p_day)
         
-        final = normalize_probs((w_ai * ai_probs) + (w_stat * stat_probs) + (w_day * day_probs), temperature=1.15)
+        # 2. หาความขัดแย้ง (Standard Deviation) ระหว่าง AI, Stat, Day ของเลขแต่ละตัว
+        stacked_probs = np.vstack([ai_probs, p_stat, p_day])
+        std_probs = np.std(stacked_probs, axis=0)
         
-        bt_msg = f"⚡ Strict WF {bt['steps']} งวด | Top-7 รอด: AI {bt['ai']:.0%} | สถิติ {bt['stat']:.0%} | วัน {bt['day']:.0%}"
+        # 3. สร้าง Final Score (ยิ่งน้อย = ยิ่งดับชัวร์)
+        # ถ้าโมเดลขัดแย้งกัน (std_probs สูง) เราจะบวกค่า Penalty เข้าไป ทำให้คะแนนพุ่งขึ้น (หลุดจากการเป็นเลขดับ)
+        # C = 1.5 คือตัวคูณ Penalty 
+        final_score = mean_probs + (1.5 * std_probs)
+        
+        # แปลงกลับเป็น Probabilities สำหรับฟังก์ชัน get_dead_numbers
+        final = normalize_probs(final_score, temperature=1.0)
+        
+        bt_msg = f"WF {bt['steps']} งวด: AI {bt['ai']:.0%} | สถิติ {bt['stat']:.0%} | วัน {bt['day']:.0%}"
         
         return {
-            "ai": ai_probs, "stat": stat_probs, "day": day_probs, "final": final,
-            "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, "bt_msg": bt_msg
+            "ai": ai_probs, "stat": p_stat, "day": p_day, "final": final,
+            "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, "bt_msg": bt_msg,
+            "std_max": np.max(std_probs) # For UI display
         }
 
 # ==============================================================================
@@ -487,6 +458,8 @@ class QuantumAI:
 # ==============================================================================
 
 def get_dead_numbers(probs, k=7):
+    # สำหรับ V7, ค่า prob ตอนนี้คือ final_score ที่โดนบวก penalty เข้าไปแล้ว
+    # ตัวไหนน้อยสุด คือตัวที่เห็นพ้องต้องกันว่า "ดับ" มากที่สุด
     idx = np.argsort(probs)[:k]
     return [(int(i), float(probs[i])) for i in idx]
 
@@ -511,9 +484,8 @@ def target_date_from_last(df, dow_input):
 # 9. MAIN UI
 # ==============================================================================
 
-st.markdown('<div class="main-title">🛑 ระบบวิเคราะห์เลขดับ V6.0 QUANTUM OMEGA</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Advanced Causal Logic • Quadratic Penalty • AI Ensemble (Top-7)</div>', unsafe_allow_html=True)
-st.divider()
+st.markdown('<div class="main-title">🛑 LOTTO AI PRO V7.0</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">NEURAL SINGULARITY • CONSENSUS VARIANCE PENALTY</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -526,8 +498,8 @@ with col2:
     day_label = st.selectbox("📅 ออกวัน", list(day_options.keys()), index=0)
     dow_input = day_options[day_label]
 
-if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡ NEURAL MAX RUN", type="primary", use_container_width=True):
-    with st.spinner("⚡ Quantum AI กำลังประมวลผลข้อมูล (Strict Causal)..."):
+if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡ SINGULARITY RUN", type="primary", use_container_width=True):
+    with st.spinner("⚡ กำลังคำนวณ Variance Penalty และ MTBO Z-Score..."):
         df = fetch_data(target_lotto)
         if df is None or df.empty:
             st.error("❌ ไม่สามารถดึงข้อมูลได้")
@@ -536,10 +508,10 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         target_date, target_dow = target_date_from_last(df, dow_input)
         dow_names = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
         
-        st.info(f"📅 **งวดเป้าหมาย:** วัน{dow_names[target_dow]} {target_date.strftime('%d/%m/%Y')} | ข้อมูลอ้างอิง {len(df)} งวด")
+        st.info(f"📅 **งวดเป้าหมาย:** วัน{dow_names[target_dow]} {target_date.strftime('%d/%m/%Y')} | อ้างอิง {len(df)} งวด")
         
         cfg = get_adaptive_config(len(df))
-        st.caption(f"⚙️ {cfg['mode']} | Trees={cfg['trees']} | Depth={cfg['max_depth']} | WF={cfg['bt_steps']} จุด")
+        st.caption(f"⚙️ {cfg['mode']} | Linear+Trees Ensemble | Consensus Penalty Applied")
 
         positions = {
             "💯 3 ตัวบน (ร้อย)": "hundred", "🔟 3 ตัวบน (สิบ)": "ten", "1️⃣ 3 ตัวบน (หน่วย)": "unit",
@@ -547,12 +519,12 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         }
 
         store_final_probs = {}
-        progress = st.progress(0, text="กำลังรันโมเดล...")
+        progress = st.progress(0, text="Init Singularity Engine...")
         
         for pos_idx, (position_name, col) in enumerate(positions.items(), start=1):
             progress.progress(pos_idx / len(positions), text=f"⚡ วิเคราะห์ {position_name}")
             
-            system = QuantumAI(df, col)
+            system = SingularityAI(df, col)
             result = system.analyze(target_date, target_dow)
             if result is None: continue
             
@@ -567,18 +539,31 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 f"""
                 <div class="dead-card">
                     <div class="position-title">{position_name}</div>
-                    <div style="text-align:center; color:#6A1B9A; font-weight:bold;">🚫 สรุปเลขดับ 7 ตัว</div>
+                    
+                    <div style="text-align:center; color:#B71C1C; font-weight:bold; font-size:16px;">
+                        🚫 ดับเอกฉันท์ 7 ตัว (Consensus Top-7)
+                    </div>
                     <div class="dead-number-highlight">{format_dead(dead_final)}</div>
                     
-                    <div style="margin-top:16px; border-top:1px dashed #E1BEE7; padding-top:12px;">
-                        <div class="info-row">🤖 <b>AI:</b> <span class="badge badge-ai">{format_dead(dead_ai)}</span></div>
-                        <div class="info-row">📊 <b>สถิติ:</b> <span class="badge badge-stat">{format_dead(dead_stat)}</span></div>
-                        <div class="info-row">📅 <b>วัน:</b> <span class="badge badge-day">{format_dead(dead_day)}</span></div>
+                    <div style="margin-top:16px; border-top:1px solid #eee; padding-top:12px;">
+                        <div class="info-row">
+                            <span>🤖 <b>AI (LR+ET+RF+HGB):</b></span>
+                            <span class="badge badge-ai">{format_dead(dead_ai)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span>📊 <b>สถิติ (MTBO+Markov):</b></span>
+                            <span class="badge badge-stat">{format_dead(dead_stat)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span>📅 <b>วัน:</b></span>
+                            <span class="badge badge-day">{format_dead(dead_day)}</span>
+                        </div>
                     </div>
                     
-                    <div style="margin-top:10px; font-size:12px; color:#7B1FA2;">
-                        {result["bt_msg"]}<br>
-                        ⚖️ น้ำหนักวิเคราะห์: AI {result["w_ai"]:.0%} | สถิติ {result["w_stat"]:.0%} | วัน {result["w_day"]:.0%}
+                    <div class="metric-box">
+                        <b>Walk-Forward:</b> {result["bt_msg"]}<br>
+                        <b>Weights:</b> AI {result["w_ai"]:.0%} | Stat {result["w_stat"]:.0%} | Day {result["w_day"]:.0%}<br>
+                        <b>Max Disagreement (Penalty):</b> +{(result['std_max']*100):.1f}
                     </div>
                 </div>
                 """, unsafe_allow_html=True
@@ -589,7 +574,7 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         # ==============================================================================
         # SUMMARY
         # ==============================================================================
-        st.subheader("🔥 สรุปภาพรวมเลขดับรวม (Top/Bottom)")
+        st.subheader("🔥 สรุปเลขดับเอกฉันท์ (Top/Bottom)")
         col_sum1, col_sum2 = st.columns(2)
 
         if all(x in store_final_probs for x in ["hundred", "ten", "unit"]):
@@ -598,9 +583,9 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             with col_sum1:
                 st.markdown(
                     f"""
-                    <div style="background:#F3E5F5; padding:15px; border-radius:10px; border:2px solid #CE93D8; text-align:center;">
-                        <div style="font-weight:bold; color:#4A148C;">🚫 ดับบนรวม 7 ตัว</div>
-                        <div style="font-size:24px; font-weight:900; color:#311B92; margin-top:10px; letter-spacing:2px;">
+                    <div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                        <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับบนรวม 7 ตัว</div>
+                        <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
                             {format_dead(dead_top)}
                         </div>
                     </div>
@@ -613,9 +598,9 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             with col_sum2:
                 st.markdown(
                     f"""
-                    <div style="background:#F3E5F5; padding:15px; border-radius:10px; border:2px solid #CE93D8; text-align:center;">
-                        <div style="font-weight:bold; color:#4A148C;">🚫 ดับล่างรวม 7 ตัว</div>
-                        <div style="font-size:24px; font-weight:900; color:#311B92; margin-top:10px; letter-spacing:2px;">
+                    <div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                        <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับล่างรวม 7 ตัว</div>
+                        <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
                             {format_dead(dead_bot)}
                         </div>
                     </div>
@@ -623,4 +608,4 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 )
                 
         st.divider()
-        st.caption("🛡️ V6.0 QUANTUM: Advanced Feature Math • Exp Penalty Walk-Forward • Temperature Scaling")
+        st.caption("🛡️ V7.0 SINGULARITY CORE: Consensus Variance Penalty • Exponential Walk-Forward Weighting • MTBO Z-Score Stats • Logistic Regression Included")
