@@ -1,63 +1,36 @@
-import streamlit as st
+Import streamlit as st
 import requests
 
-# ==========================================
-# 1. ตั้งค่าหน้าเว็บ (Page Config - ต้องอยู่บรรทัดแรกสุดเสมอ)
-# ==========================================
-st.set_page_config(
-    page_title="AI วิเคราะห์หวย ครบวงจร", 
-    page_icon="🎯", 
-    layout="centered"
-)
+# --- 1. ตั้งค่าหน้าเว็บ (ต้องอยู่บนสุด และเรียกใช้ได้แค่ครั้งเดียว) ---
+st.set_page_config(page_title="AI วิเคราะห์หวย ครบวงจร", page_icon="🎯", layout="centered")
 
-# ==========================================
-# 2. กำหนด URL ของระบบต่างๆ (System URLs)
-# ==========================================
-# จัดระเบียบ URL ให้อ่านและแก้ไขง่ายขึ้น
-GITHUB_RAW_URL = "https://raw.githubusercontent.com/suksanhankutlo-stack/lotto-ai-app/refs/heads/main/"
+# --- 2. กำหนด URL ของระบบต่างๆ ---
+URL_LEKDEN = "https://raw.githubusercontent.com/suksanhankutlo-stack/lotto-ai-app/refs/heads/main/lotto_lekden.py"  
+URL_LEKDUB = "https://raw.githubusercontent.com/suksanhankutlo-stack/lotto-ai-app/refs/heads/main/lotto_lekdub.py"
 
-URL_LEKDEN = f"{GITHUB_RAW_URL}lotto_lekden.py"  
-URL_LEKDUB = f"{GITHUB_RAW_URL}lotto_lekdub.py"
-
-# ==========================================
-# 3. ฟังก์ชันสำหรับดึงและรันโค้ดจาก URL
-# ==========================================
+# --- 3. ฟังก์ชันสำหรับดึงและรันโค้ดจาก URL ---
 def run_script_from_url(url):
-    """ดึงไฟล์ Python จาก GitHub และรันผลลัพธ์แสดงบน Streamlit ทันที"""
     try:
-        # เพิ่ม Spinner ให้ผู้ใช้รู้ว่าระบบกำลังประมวลผล
-        with st.spinner("⏳ ระบบกำลังดึงข้อมูล... กรุณารอซักครู่"):
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            
-            # ใช้ exec() เพื่อประมวลผลโค้ดที่ดึงมา
-            exec(response.text, globals())
-            
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        
+        # ใช้คำสั่ง exec() เพื่อประมวลผลโค้ดที่ดึงมาจากลิงก์
+        # โดยให้รันในบริบท (context) ปัจจุบัน เพื่อให้ UI ไปแสดงใน Tab ที่ถูกต้อง
+        exec(response.text, globals())
+        
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ ไม่สามารถดึงข้อมูลจากลิงก์ได้ (ปัญหาการเชื่อมต่อ): {e}")
+        st.error(f"❌ ไม่สามารถดึงข้อมูลจากลิงก์ได้: {e}")
     except Exception as e:
-        st.error(f"❌ เกิดข้อผิดพลาดในการประมวลผลระบบ: {e}")
+        st.error(f"❌ เกิดข้อผิดพลาดในการรันระบบ: {e}")
 
-# ==========================================
-# 4. ส่วนแสดงผล UI (User Interface)
-# ==========================================
+# --- 4. สร้าง UI แบบ Tabs (ไม่ต้องซ่อนเมนูใน Sidebar) ---
 
-# ส่วนหัวของแอปพลิเคชัน
-st.title("🎯 AI วิเคราะห์หวย ครบวงจร")
-st.markdown("ระบบผู้ช่วยวิเคราะห์ **ตัวเลขเด่น** และ **เลขดับ** ด้วย AI เพื่อประกอบการตัดสินใจ")
-st.divider() # เส้นคั่นบางๆ เพื่อความสวยงาม
-
-# สร้าง UI แบบ Tabs
 tab1, tab2 = st.tabs(["🟢 ระบบวิเคราะห์เลขเด่น", "🔴 ระบบวิเคราะห์เลขดับ"])
 
 with tab1:
-    st.subheader("✨ วิเคราะห์เลขเด่น")
+    # เมื่ออยู่ใน tab1 ให้ดึงโค้ดเลขเด่นมารัน UI จะแสดงในกรอบนี้ทันที
     run_script_from_url(URL_LEKDEN)
 
 with tab2:
-    st.subheader("🛑 วิเคราะห์เลขดับ")
+    # เมื่ออยู่ใน tab2 ให้ดึงโค้ดเลขดับมารัน
     run_script_from_url(URL_LEKDUB)
-
-# ส่วนท้าย (Footer)
-st.divider()
-st.caption("📌 หมายเหตุ: ข้อมูลนี้เป็นเพียงการวิเคราะห์ทางสถิติและการคำนวณ โปรดใช้วิจารณญาณในการรับชม")
