@@ -199,7 +199,7 @@ def model_probs(model, X):
         return np.ones(10) / 10
 
 # ==============================================================================
-# 6. SINGULARITY STATISTICAL SYSTEM
+# 6. SINGULARITY STATISTICAL SYSTEM (WITH REPEAT EVALUATOR)
 # ==============================================================================
 
 class SingularityStatSystem:
@@ -222,6 +222,14 @@ class SingularityStatSystem:
         if n == 0: return np.ones(10) / 10
         
         result = np.zeros(10)
+        
+        # 1. หาค่าเฉลี่ยการออกซ้ำของ "ทั้งระบบ" (Global Repeat Rate)
+        if n > 1:
+            global_repeats = np.sum(seq[1:] == seq[:-1])
+            global_repeat_rate = global_repeats / (n - 1)
+        else:
+            global_repeat_rate = 0.1
+            
         for d in range(10):
             pos = np.where(seq == d)[0]
             if len(pos) > 1:
@@ -232,11 +240,36 @@ class SingularityStatSystem:
                 avg_gap, std_gap = 10.0, 5.0
                 
             current_gap = n - pos[-1] - 1 if len(pos) else 60
+            
+            # Z-Score พื้นฐาน
             z = (current_gap - avg_gap) / std_gap
-            freq = np.mean(seq == d)
             prob_z = 1 / (1 + np.exp(-z))
             
+            # -------------------------------------------------------------
+            # 🔥 ระบบประเมินก่อนตัดทิ้ง (Momentum & Repeat Evaluator)
+            # -------------------------------------------------------------
+            if current_gap == 0 and len(pos) > 0:
+                # ถ้าเพิ่งออกไปงวดที่แล้ว ให้คำนวณ "สถิติการออกเบิ้ล/ตาม" ของเลขตัวนี้
+                specific_repeats = np.sum((seq[:-1] == d) & (seq[1:] == d))
+                specific_repeat_rate = specific_repeats / len(pos)
+                
+                # ถ้านิสัยของเลขนี้ชอบออกซ้ำ หรือ หลักนี้ชอบออกซ้ำ จะสร้าง Rescue Score
+                rescue_score = (0.6 * specific_repeat_rate) + (0.4 * global_repeat_rate)
+                
+                # ขยายสเกลเพื่อให้ต่อสู้กับ Z-score ที่ต่ำได้
+                rescue_factor = rescue_score * 2.5 
+                
+                # แทนที่จะให้คะแนนต่ำจนดับชัวร์ ระบบจะดึงค่าขึ้นมาตาม Rescue Factor
+                prob_z = max(prob_z, rescue_factor)
+                
+            elif current_gap == 1 and len(pos) > 0:
+                # เผื่อกรณีออกสลับฟันปลา (เช่น 4 -> 7 -> 4) ช่วยเซฟไม่ให้โดนตัดทิ้งรุนแรงเกินไป
+                prob_z = max(prob_z, 0.15)
+
+            freq = np.mean(seq == d)
+            # ให้น้ำหนักจังหวะรอบการออก (MTBO) 70% และความถี่รวม 30%
             result[d] = (0.7 * prob_z) + (0.3 * freq)
+            
         return normalize_probs(result)
 
     @staticmethod
