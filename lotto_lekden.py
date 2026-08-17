@@ -371,7 +371,7 @@ def combine_top_n(preds, positions, n=5):
 # ============================================================
 # 13. UI HEADER
 # ============================================================
-st.markdown('<div class="main-title">🚀 LOTTO AI V.MAX 5-TOP</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title"> LOTTO AI V.MAX 5-TOP</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">High Accuracy Tuned • Advanced Feature Engineering<br><b>สรุปเด่น 5-TOP | AI & สถิติ 3-TOP (UI แจ่มชัด)</b></div>', unsafe_allow_html=True)
 st.divider()
 
