@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V7.0 NEURAL SINGULARITY (PREMIUM UI)
+# 🛑 LOTTO AI PRO V7.0 NEURAL SINGULARITY (PREMIUM UI FIXED)
 # CONSENSUS VARIANCE PENALTY • MTBO Z-SCORE • EXPONENTIAL WF
 # CANDIDATE ELIMINATION TOP-7
 # ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION
@@ -444,86 +444,83 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             dead_day = get_dead_numbers(result["day"], 7)
             
             # -------------------------------------------------------------
-            # NEW PREMIUM UI INJECTION
+            # NEW PREMIUM UI INJECTION (NO INDENTATION FIX)
             # -------------------------------------------------------------
-            st.markdown(
-                f"""
-                <div style="background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 20px;">
-                    
-                    <!-- Header: ตำแหน่ง / ชื่อ -->
-                    <div style="font-size: 20px; font-weight: 900; color: #222; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px;">
-                        {position_name}
-                    </div>
-                    
-                    <!-- ส่วนที่ 1: เลขดับเอกฉันท์ -->
-                    <div style="background: linear-gradient(135deg, #fff5f5, #ffebee); border: 2px solid #ffcdd2; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
-                        <div style="color: #D32F2F; font-weight: 800; font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">
-                            🚫 ดับเอกฉันท์ 7 ตัว (Consensus Top-7)
-                        </div>
-                        <div style="font-size: 36px; font-weight: 900; color: #B71C1C; letter-spacing: 8px; text-shadow: 1px 1px 0px rgba(255,255,255,0.8);">
-                            {format_dead(dead_final)}
-                        </div>
-                    </div>
+            st.markdown(f"""
+<div style="background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; box-shadow: 0 8px 20px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 20px;">
+    
+    <!-- Header: ตำแหน่ง / ชื่อ -->
+    <div style="font-size: 20px; font-weight: 900; color: #222; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px;">
+        {position_name}
+    </div>
+    
+    <!-- ส่วนที่ 1: เลขดับเอกฉันท์ -->
+    <div style="background: linear-gradient(135deg, #fff5f5, #ffebee); border: 2px solid #ffcdd2; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
+        <div style="color: #D32F2F; font-weight: 800; font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">
+            🚫 ดับเอกฉันท์ 7 ตัว (Consensus Top-7)
+        </div>
+        <div style="font-size: 36px; font-weight: 900; color: #B71C1C; letter-spacing: 8px; text-shadow: 1px 1px 0px rgba(255,255,255,0.8);">
+            {format_dead(dead_final)}
+        </div>
+    </div>
 
-                    <!-- ส่วนที่ 2: ที่มาของเลข -->
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #1976D2;">
-                            <span style="font-size: 14px; color: #333;">🤖 <b>AI (LR+ET+RF+HGB)</b></span>
-                            <span style="background: #E3F2FD; color: #1565C0; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
-                                {format_dead(dead_ai)}
-                            </span>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #388E3C;">
-                            <span style="font-size: 14px; color: #333;">📊 <b>สถิติ (MTBO+Markov)</b></span>
-                            <span style="background: #E8F5E9; color: #2E7D32; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
-                                {format_dead(dead_stat)}
-                            </span>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #F57C00;">
-                            <span style="font-size: 14px; color: #333;">📅 <b>วัน</b></span>
-                            <span style="background: #FFF3E0; color: #E65100; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
-                                {format_dead(dead_day)}
-                            </span>
-                        </div>
+    <!-- ส่วนที่ 2: ที่มาของเลข -->
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #1976D2;">
+            <span style="font-size: 14px; color: #333;">🤖 <b>AI (LR+ET+RF+HGB)</b></span>
+            <span style="background: #E3F2FD; color: #1565C0; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                {format_dead(dead_ai)}
+            </span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #388E3C;">
+            <span style="font-size: 14px; color: #333;">📊 <b>สถิติ (MTBO+Markov)</b></span>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                {format_dead(dead_stat)}
+            </span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 8px; border-left: 4px solid #F57C00;">
+            <span style="font-size: 14px; color: #333;">📅 <b>วัน</b></span>
+            <span style="background: #FFF3E0; color: #E65100; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 15px; letter-spacing: 3px;">
+                {format_dead(dead_day)}
+            </span>
+        </div>
 
-                    </div>
+    </div>
 
-                    <!-- ส่วนที่ 3: Analytics Dashboard -->
-                    <div style="background: #263238; border-radius: 10px; padding: 15px; color: #CFD8DC; font-family: sans-serif;">
-                        <div style="text-align: center; color: #ffffff; font-weight: bold; font-size: 14px; margin-bottom: 12px; letter-spacing: 0.5px;">
-                            ⚡ Walk-Forward Analysis (WF {result['bt_steps']} งวด)
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; text-align: center; border-bottom: 1px solid #37474F; padding-bottom: 12px; margin-bottom: 12px;">
-                            <div style="flex: 1;">
-                                <div style="color: #64B5F6; font-size: 12px; margin-bottom: 4px;">🤖 ความแม่น AI</div>
-                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_ai']*100):.0f}%</div>
-                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_ai']*100):.0f}%</div>
-                            </div>
-                            <div style="flex: 1; border-left: 1px solid #37474F; border-right: 1px solid #37474F;">
-                                <div style="color: #81C784; font-size: 12px; margin-bottom: 4px;">📊 ความแม่นสถิติ</div>
-                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_stat']*100):.0f}%</div>
-                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_stat']*100):.0f}%</div>
-                            </div>
-                            <div style="flex: 1;">
-                                <div style="color: #FFB74D; font-size: 12px; margin-bottom: 4px;">📅 ความแม่นวัน</div>
-                                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_day']*100):.0f}%</div>
-                                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_day']*100):.0f}%</div>
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: center; color: #FF8A65; font-size: 13px; font-weight: 700;">
-                            ⚠️ Max Disagreement (Penalty): +{(result['std_max']*100):.1f}
-                        </div>
-                    </div>
+    <!-- ส่วนที่ 3: Analytics Dashboard -->
+    <div style="background: #263238; border-radius: 10px; padding: 15px; color: #CFD8DC; font-family: sans-serif;">
+        <div style="text-align: center; color: #ffffff; font-weight: bold; font-size: 14px; margin-bottom: 12px; letter-spacing: 0.5px;">
+            ⚡ Walk-Forward Analysis (WF {result['bt_steps']} งวด)
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; text-align: center; border-bottom: 1px solid #37474F; padding-bottom: 12px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+                <div style="color: #64B5F6; font-size: 12px; margin-bottom: 4px;">🤖 ความแม่น AI</div>
+                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_ai']*100):.0f}%</div>
+                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_ai']*100):.0f}%</div>
+            </div>
+            <div style="flex: 1; border-left: 1px solid #37474F; border-right: 1px solid #37474F;">
+                <div style="color: #81C784; font-size: 12px; margin-bottom: 4px;">📊 ความแม่นสถิติ</div>
+                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_stat']*100):.0f}%</div>
+                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_stat']*100):.0f}%</div>
+            </div>
+            <div style="flex: 1;">
+                <div style="color: #FFB74D; font-size: 12px; margin-bottom: 4px;">📅 ความแม่นวัน</div>
+                <div style="font-size: 18px; color: #ffffff; font-weight: 900;">{(result['bt_day']*100):.0f}%</div>
+                <div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result['w_day']*100):.0f}%</div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; color: #FF8A65; font-size: 13px; font-weight: 700;">
+            ⚠️ Max Disagreement (Penalty): +{(result['std_max']*100):.1f}
+        </div>
+    </div>
 
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+</div>
+""", unsafe_allow_html=True)
             
         progress.empty()
 
@@ -537,31 +534,27 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             top_probs = normalize_probs((store_final_probs["hundred"] + store_final_probs["ten"] + store_final_probs["unit"]) / 3.0)
             dead_top = get_dead_numbers(top_probs, 7)
             with col_sum1:
-                st.markdown(
-                    f"""
-                    <div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับบนรวม 7 ตัว</div>
-                        <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
-                            {format_dead(dead_top)}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True
-                )
+                st.markdown(f"""
+<div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับบนรวม 7 ตัว</div>
+    <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
+        {format_dead(dead_top)}
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
         if all(x in store_final_probs for x in ["bot_ten", "bot_unit"]):
             bot_probs = normalize_probs((store_final_probs["bot_ten"] + store_final_probs["bot_unit"]) / 2.0)
             dead_bot = get_dead_numbers(bot_probs, 7)
             with col_sum2:
-                st.markdown(
-                    f"""
-                    <div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับล่างรวม 7 ตัว</div>
-                        <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
-                            {format_dead(dead_bot)}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True
-                )
+                st.markdown(f"""
+<div style="background:#fff5f5; padding:20px; border-radius:12px; border:2px solid #ffcdd2; text-align:center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <div style="font-weight:900; color:#d32f2f; font-size: 18px;">🚫 ดับล่างรวม 7 ตัว</div>
+    <div style="font-size:28px; font-weight:900; color:#B71C1C; margin-top:15px; letter-spacing:4px;">
+        {format_dead(dead_bot)}
+    </div>
+</div>
+""", unsafe_allow_html=True)
                 
         st.divider()
         st.caption("🛡️ V7.0 SINGULARITY CORE: Consensus Variance Penalty • Exponential Walk-Forward Weighting • MTBO Z-Score Stats • Logistic Regression Included")
