@@ -1,6 +1,6 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V7.5 NEURAL SINGULARITY (OPTIMIZED FOR ACCURACY & SPEED)
-# CONSENSUS VARIANCE PENALTY • MTBO Z-SCORE • EXPONENTIAL WF
+# 🛑 LOTTO AI PRO V7.6 NEURAL SINGULARITY (STABILIZED WEIGHTS & PENALTY)
+# CONSENSUS VARIANCE PENALTY (FIXED) • MTBO Z-SCORE • SHRINKAGE WF WEIGHTS
 # CANDIDATE ELIMINATION TOP-7
 # ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION (TUNED)
 # ==============================================================================
@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 # ==============================================================================
 
 st.set_page_config(
-    page_title="ระบบวิเคราะห์เลขดับ PRO V7.5 SINGULARITY",
+    page_title="ระบบวิเคราะห์เลขดับ PRO V7.6 SINGULARITY",
     page_icon="🛑",
     layout="centered"
 )
@@ -147,7 +147,6 @@ def build_features_cached(df, target_col, lags, rolls):
     x["prev_prime"] = prev.isin(primes).astype(np.float32)
     x["prev_mod3"] = prev % 3
     
-    # Time Seasonality Features
     dt = x["date"].dt
     weekday = dt.weekday.astype(float)
     x["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
@@ -280,19 +279,17 @@ class SingularityAI:
         self.n = len(df)
         self.cfg = get_adaptive_config(self.n)
         
-        # 🔥 TUNED MODELS FOR HIGHER ACCURACY (Less Overfitting, Faster Execution)
         self.models = {
             "LR": make_pipeline(
                 StandardScaler(), 
-                LogisticRegression(max_iter=200, class_weight='balanced', C=0.1, random_state=42) # Increased Regularization
+                LogisticRegression(max_iter=200, class_weight='balanced', C=0.1, random_state=42)
             ),
-            "ET": ExtraTreesClassifier(n_estimators=self.cfg["trees"], max_depth=self.cfg["max_depth"], min_samples_leaf=4, max_features="sqrt", class_weight="balanced", random_state=43, n_jobs=-1), # Optimized Pruning
-            "RF": RandomForestClassifier(n_estimators=max(30, self.cfg["trees"] // 2), max_depth=self.cfg["max_depth"], min_samples_leaf=4, max_features="log2", class_weight="balanced", random_state=44, n_jobs=-1), # Lighter RF
-            "HGB": HistGradientBoostingClassifier(max_iter=70, max_depth=min(5, self.cfg["max_depth"]), learning_rate=0.03, min_samples_leaf=4, l2_regularization=2.0, random_state=45) # Anti-Noise Regularization
+            "ET": ExtraTreesClassifier(n_estimators=self.cfg["trees"], max_depth=self.cfg["max_depth"], min_samples_leaf=4, max_features="sqrt", class_weight="balanced", random_state=43, n_jobs=-1),
+            "RF": RandomForestClassifier(n_estimators=max(30, self.cfg["trees"] // 2), max_depth=self.cfg["max_depth"], min_samples_leaf=4, max_features="log2", class_weight="balanced", random_state=44, n_jobs=-1),
+            "HGB": HistGradientBoostingClassifier(max_iter=70, max_depth=min(5, self.cfg["max_depth"]), learning_rate=0.03, min_samples_leaf=4, l2_regularization=2.0, random_state=45)
         }
 
     def train_predict(self, X_train, y_train, X_predict, weights=None):
-        # 🔥 SHIFTED WEIGHTS: Focus on robust models for noisy data
         if weights is None: weights = {"LR": 0.15, "ET": 0.40, "RF": 0.10, "HGB": 0.35}
         result = np.zeros(10)
         total = 0.0
@@ -356,15 +353,26 @@ class SingularityAI:
         bt = self.walk_forward(X_all, y_all, self.df)
         
         base_ai, base_stat, base_day = 0.50, 0.35, 0.15
+        
         if bt["steps"] > 0:
-            # 🔥 STEEPER EXPONENTIAL PENALTY FOR POOR PERFORMANCE
-            ai_score = np.exp(6 * (bt["ai"] - 0.5))
-            stat_score = np.exp(6 * (bt["stat"] - 0.5))
-            day_score = np.exp(6 * (bt["day"] - 0.5))
+            # 2. ลดความแรงของ Walk-Forward Weighting (Strength = 2.5)
+            strength = 2.5
+            ai_score = np.exp(strength * (bt["ai"] - 0.5))
+            stat_score = np.exp(strength * (bt["stat"] - 0.5))
+            day_score = np.exp(strength * (bt["day"] - 0.5))
             total = (base_ai * ai_score) + (base_stat * stat_score) + (base_day * day_score)
-            w_ai = (base_ai * ai_score) / total
-            w_stat = (base_stat * stat_score) / total
-            w_day = (base_day * day_score) / total
+            
+            wf_ai = (base_ai * ai_score) / total
+            wf_stat = (base_stat * stat_score) / total
+            wf_day = (base_day * day_score) / total
+            
+            # 3. เพิ่ม Weight Shrinkage (ดึงน้ำหนักกลับฐานหากข้อมูลน้อย)
+            reliability = min(1.0, bt["steps"] / 15.0)
+            shrink = 0.35 + (1.0 - reliability) * 0.25
+            
+            w_ai = (1 - shrink) * wf_ai + shrink * base_ai
+            w_stat = (1 - shrink) * wf_stat + shrink * base_stat
+            w_day = (1 - shrink) * wf_day + shrink * base_day
         else:
             w_ai, w_stat, w_day = base_ai, base_stat, base_day
             
@@ -373,18 +381,21 @@ class SingularityAI:
         p_stat = normalize_probs((0.4 * SingularityStatSystem.markov_blend(seq)) + (0.6 * SingularityStatSystem.mtbo_skip(seq)))
         p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
         
-        # Consensus Variance Penalty
         mean_probs = (w_ai * ai_probs) + (w_stat * p_stat) + (w_day * p_day)
         stacked_probs = np.vstack([ai_probs, p_stat, p_day])
         std_probs = np.std(stacked_probs, axis=0)
-        final_score = mean_probs + (1.5 * std_probs)
+        
+        # 1. แก้ Variance Penalty (โมเดลเห็นต่างกัน หักคะแนนทิ้ง)
+        variance_penalty = 0.60 * std_probs
+        final_score = mean_probs - variance_penalty
+        final_score = np.maximum(final_score, 1e-9)
         final = normalize_probs(final_score, temperature=1.0)
         
         return {
             "ai": ai_probs, "stat": p_stat, "day": p_day, "final": final,
             "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, 
             "bt_ai": bt["ai"], "bt_stat": bt["stat"], "bt_day": bt["day"], "bt_steps": bt["steps"],
-            "std_max": np.max(std_probs)
+            "std_max": np.max(variance_penalty) # Update to show actual penalty deduction in UI
         }
 
 # ==============================================================================
@@ -416,8 +427,8 @@ def target_date_from_last(df, dow_input):
 # 9. MAIN UI
 # ==============================================================================
 
-st.markdown('<div class="main-title"> LOTTO AI PRO V7.5</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">NEURAL SINGULARITY OPTIMIZED • HIGH-BIAS LOW-VARIANCE MODELING</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title"> LOTTO AI PRO V7.6</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">STABILIZED WEIGHTS & CORRECTED VARIANCE PENALTY</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -443,7 +454,7 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         st.info(f"📅 **งวดเป้าหมาย:** วัน{dow_names[target_dow]} {target_date.strftime('%d/%m/%Y')} | อ้างอิง {len(df)} งวด")
         
         cfg = get_adaptive_config(len(df))
-        st.caption(f"⚙️ {cfg['mode']} | Optimized Ensembles | Penalty Applied")
+        st.caption(f"⚙️ {cfg['mode']} | Shrinkage WF Applied | Negative Variance Penalty")
 
         positions = {
             "💯 3 ตัวบน (ร้อย)": "hundred", "🔟 3 ตัวบน (สิบ)": "ten", "1️⃣ 3 ตัวบน (หน่วย)": "unit",
@@ -511,7 +522,7 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 f'<div style="font-size: 11px; color: #90A4AE; margin-top: 2px;">น้ำหนัก: {(result["w_day"]*100):.0f}%</div>'
                 '</div>'
                 '</div>'
-                f'<div style="text-align: center; color: #FF8A65; font-size: 13px; font-weight: 700;">⚠️ Max Disagreement (Penalty): +{(result["std_max"]*100):.1f}</div>'
+                f'<div style="text-align: center; color: #FF8A65; font-size: 13px; font-weight: 700;">⚠️ Max Disagreement Penalty (-): {(result["std_max"]*100):.2f}%</div>'
                 '</div>'
                 
                 '</div>'
@@ -551,4 +562,4 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 st.markdown(html_sum2, unsafe_allow_html=True)
                 
         st.divider()
-        st.caption("🛡️ V7.5 SINGULARITY OPTIMIZED: High-Bias/Low-Variance Tuning • Enhanced Time Features • Steeper Penalties")
+        st.caption("🛡️ V7.6 SINGULARITY: Fixed Negative Variance Penalty • Stabilized Shrinkage Weights • Scaled Backtest Strength")
