@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V7.6 NEURAL SINGULARITY (STABILIZED WEIGHTS & PENALTY)
+# 🛑 LOTTO AI PRO V7.7 NEURAL SINGULARITY (BASELINE 70% FIXED)
 # CONSENSUS VARIANCE PENALTY (FIXED) • MTBO Z-SCORE • SHRINKAGE WF WEIGHTS
 # CANDIDATE ELIMINATION TOP-7
 # ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION (TUNED)
@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 # ==============================================================================
 
 st.set_page_config(
-    page_title="ระบบวิเคราะห์เลขดับ PRO V7.6 SINGULARITY",
+    page_title="ระบบวิเคราะห์เลขดับ PRO V7.7 SINGULARITY",
     page_icon="🛑",
     layout="centered"
 )
@@ -355,47 +355,105 @@ class SingularityAI:
         base_ai, base_stat, base_day = 0.50, 0.35, 0.15
         
         if bt["steps"] > 0:
-            # 2. ลดความแรงของ Walk-Forward Weighting (Strength = 2.5)
+            # Top-7 / 10 random baseline = 70%
+            baseline = 0.70
+
+            # จำกัดอิทธิพลของ WF ไม่ให้แกว่งแรง
             strength = 2.5
-            ai_score = np.exp(strength * (bt["ai"] - 0.5))
-            stat_score = np.exp(strength * (bt["stat"] - 0.5))
-            day_score = np.exp(strength * (bt["day"] - 0.5))
-            total = (base_ai * ai_score) + (base_stat * stat_score) + (base_day * day_score)
-            
+
+            ai_score = np.exp(
+                strength * (bt["ai"] - baseline)
+            )
+
+            stat_score = np.exp(
+                strength * (bt["stat"] - baseline)
+            )
+
+            day_score = np.exp(
+                strength * (bt["day"] - baseline)
+            )
+
+            total = (
+                base_ai * ai_score +
+                base_stat * stat_score +
+                base_day * day_score
+            )
+
             wf_ai = (base_ai * ai_score) / total
             wf_stat = (base_stat * stat_score) / total
             wf_day = (base_day * day_score) / total
-            
-            # 3. เพิ่ม Weight Shrinkage (ดึงน้ำหนักกลับฐานหากข้อมูลน้อย)
-            reliability = min(1.0, bt["steps"] / 15.0)
-            shrink = 0.35 + (1.0 - reliability) * 0.25
-            
-            w_ai = (1 - shrink) * wf_ai + shrink * base_ai
-            w_stat = (1 - shrink) * wf_stat + shrink * base_stat
-            w_day = (1 - shrink) * wf_day + shrink * base_day
+
+            reliability = min(
+                1.0,
+                bt["steps"] / 15.0
+            )
+
+            shrink = (
+                0.35 +
+                (1.0 - reliability) * 0.25
+            )
+
+            w_ai = (
+                (1 - shrink) * wf_ai +
+                shrink * base_ai
+            )
+
+            w_stat = (
+                (1 - shrink) * wf_stat +
+                shrink * base_stat
+            )
+
+            w_day = (
+                (1 - shrink) * wf_day +
+                shrink * base_day
+            )
+
         else:
-            w_ai, w_stat, w_day = base_ai, base_stat, base_day
-            
+            w_ai = base_ai
+            w_stat = base_stat
+            w_day = base_day
+
         ai_probs = self.train_predict(X_all, y_all, X_predict)
         seq = y_all.to_numpy(dtype=int)
         p_stat = normalize_probs((0.4 * SingularityStatSystem.markov_blend(seq)) + (0.6 * SingularityStatSystem.mtbo_skip(seq)))
         p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
         
-        mean_probs = (w_ai * ai_probs) + (w_stat * p_stat) + (w_day * p_day)
-        stacked_probs = np.vstack([ai_probs, p_stat, p_day])
-        std_probs = np.std(stacked_probs, axis=0)
-        
-        # 1. แก้ Variance Penalty (โมเดลเห็นต่างกัน หักคะแนนทิ้ง)
+        mean_probs = (
+            w_ai * ai_probs +
+            w_stat * p_stat +
+            w_day * p_day
+        )
+
+        stacked_probs = np.vstack([
+            ai_probs,
+            p_stat,
+            p_day
+        ])
+
+        std_probs = np.std(
+            stacked_probs,
+            axis=0
+        )
+
         variance_penalty = 0.60 * std_probs
+
         final_score = mean_probs - variance_penalty
-        final_score = np.maximum(final_score, 1e-9)
-        final = normalize_probs(final_score, temperature=1.0)
+
+        final_score = np.maximum(
+            final_score,
+            1e-9
+        )
+
+        final = normalize_probs(
+            final_score,
+            temperature=1.0
+        )
         
         return {
             "ai": ai_probs, "stat": p_stat, "day": p_day, "final": final,
             "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, 
             "bt_ai": bt["ai"], "bt_stat": bt["stat"], "bt_day": bt["day"], "bt_steps": bt["steps"],
-            "std_max": np.max(variance_penalty) # Update to show actual penalty deduction in UI
+            "std_max": np.max(variance_penalty)
         }
 
 # ==============================================================================
@@ -427,8 +485,8 @@ def target_date_from_last(df, dow_input):
 # 9. MAIN UI
 # ==============================================================================
 
-st.markdown('<div class="main-title"> LOTTO AI PRO V7.6</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">STABILIZED WEIGHTS & CORRECTED VARIANCE PENALTY</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title"> LOTTO AI PRO V7.7</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">STABILIZED WEIGHTS & BASELINE 70% FIXED</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -454,7 +512,7 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         st.info(f"📅 **งวดเป้าหมาย:** วัน{dow_names[target_dow]} {target_date.strftime('%d/%m/%Y')} | อ้างอิง {len(df)} งวด")
         
         cfg = get_adaptive_config(len(df))
-        st.caption(f"⚙️ {cfg['mode']} | Shrinkage WF Applied | Negative Variance Penalty")
+        st.caption(f"⚙️ {cfg['mode']} | Shrinkage WF Applied | Baseline 70% Logic")
 
         positions = {
             "💯 3 ตัวบน (ร้อย)": "hundred", "🔟 3 ตัวบน (สิบ)": "ten", "1️⃣ 3 ตัวบน (หน่วย)": "unit",
@@ -562,4 +620,4 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 st.markdown(html_sum2, unsafe_allow_html=True)
                 
         st.divider()
-        st.caption("🛡️ V7.6 SINGULARITY: Fixed Negative Variance Penalty • Stabilized Shrinkage Weights • Scaled Backtest Strength")
+        st.caption("🛡️ V7.7 SINGULARITY: Fixed Negative Variance Penalty • Stabilized Shrinkage Weights • Baseline 70% Fixed")
