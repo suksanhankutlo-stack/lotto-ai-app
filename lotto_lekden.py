@@ -7,7 +7,6 @@ import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import re
-import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import warnings
 
@@ -133,7 +132,7 @@ def fetch_and_clean_data(url):
         return pd.DataFrame()
 
 # ============================================================
-# 4. TUNED FEATURE ENGINEERING (เพิ่ม Rolling STD)
+# 4. TUNED FEATURE ENGINEERING
 # ============================================================
 def build_features(df, lags, rolls):
     x = df.copy()
@@ -150,7 +149,6 @@ def build_features(df, lags, rolls):
 
     ph, pt, po = x["H"].shift(1), x["T"].shift(1), x["O"].shift(1)
     x["PrevSum"] = ph + pt + po
-    x["PrevRange"] = pd.concat([ph, pt, po], axis=1).max(axis=1) - pd.concat([ph, pt, po], axis=1).min(axis=1)
     x["PrevOdd"] = (ph % 2) + (pt % 2) + (po % 2)
     x["DistHT"], x["DistTO"] = (ph - pt).abs(), (pt - po).abs()
 
@@ -164,7 +162,6 @@ def build_features(df, lags, rolls):
         for lag in lags: x[f"L{lag}_{pos}"] = s.shift(lag)
         for w in rolls: 
             x[f"RM{w}_{pos}"] = s.shift(1).rolling(w, min_periods=1).mean()
-            x[f"RSTD{w}_{pos}"] = s.shift(1).rolling(w, min_periods=1).std().fillna(0) # เพิ่ม STD ความเหวี่ยง
 
         arr = s.to_numpy()
         skip = np.zeros(len(arr), dtype=np.float32)
@@ -178,13 +175,13 @@ def build_features(df, lags, rolls):
     return x.replace([np.inf, -np.inf], np.nan).fillna(-1)
 
 # ============================================================
-# 5-9. STATISTIC ENGINES (ปรับน้ำหนักระยะใกล้)
+# 5-9. STATISTIC ENGINES 
 # ============================================================
 class FrequencyEngine:
     def analyze(self, df, pos):
         s = df[pos].astype(int)
         if len(s) == 0: return np.ones(10) / 10
-        r15 = s.tail(15).value_counts(normalize=True) # เน้น 15 งวดล่าสุด
+        r15 = s.tail(15).value_counts(normalize=True) 
         r30 = s.tail(30).value_counts(normalize=True)
         all_f = s.value_counts(normalize=True)
         score = np.array([r15.get(d, 0)*0.55 + r30.get(d, 0)*0.30 + all_f.get(d, 0)*0.15 for d in range(10)])
@@ -194,7 +191,14 @@ class FrequencyEngine:
 class CalendarEngine:
     def analyze(self, df, pos, next_date):
         subset = df[df["DOW"] == next_date.dayofweek]
-        if len(subset) < 5: subset = df
+        
+        # กฎใหม่: ถ้าข้อมูลวันนั้นๆ มีไม่ถึง 25 งวด "ไม่ต้องคำนวณ"
+        if len(subset) < 25:
+            # คืนค่าความน่าจะเป็นแบบเป็นกลาง (ให้ทุกเลข 10% เท่ากัน)
+            # เพื่อให้ไม่มีเลขไหนได้เปรียบเสียเปรียบ
+            return np.ones(10) / 10
+            
+        # ถ้าข้อมูลถึง 25 งวด ค่อยคำนวณตามปกติ
         a = subset[pos].value_counts(normalize=True)
         b = subset.tail(25)[pos].value_counts(normalize=True)
         score = np.array([a.get(d, 0)*0.3 + b.get(d, 0)*0.7 for d in range(10)])
@@ -244,19 +248,19 @@ class FastAI:
         total_w = 0
 
         if rf_w > 0:
-            model = RandomForestClassifier(n_estimators=self.trees+10, max_depth=8, min_samples_leaf=2, max_features="sqrt", class_weight="balanced", n_jobs=-1, random_state=42)
+            model = RandomForestClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, max_features="sqrt", class_weight="balanced", n_jobs=-1, random_state=42)
             model.fit(X, y)
             for c, p in zip(model.classes_, model.predict_proba(X_next)[0]): result[int(c)] += p * rf_w
             total_w += rf_w
 
         if et_w > 0:
-            model = ExtraTreesClassifier(n_estimators=self.trees+10, max_depth=8, min_samples_leaf=2, max_features="sqrt", class_weight="balanced", n_jobs=-1, random_state=43)
+            model = ExtraTreesClassifier(n_estimators=self.trees, max_depth=6, min_samples_leaf=3, max_features="sqrt", class_weight="balanced", n_jobs=-1, random_state=43)
             model.fit(X, y)
             for c, p in zip(model.classes_, model.predict_proba(X_next)[0]): result[int(c)] += p * et_w
             total_w += et_w
 
         if hgb_w > 0:
-            model = HistGradientBoostingClassifier(max_iter=80, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=3, l2_regularization=0.2, random_state=44)
+            model = HistGradientBoostingClassifier(max_iter=80, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=3, l2_regularization=0.5, random_state=44)
             model.fit(X, y)
             for c, p in zip(model.classes_, model.predict_proba(X_next)[0]): result[int(c)] += p * hgb_w
             total_w += hgb_w
@@ -273,9 +277,14 @@ class EnsembleEngine:
         self.df, self.target_dow = df.copy(), target_dow
         n = len(df)
 
-        if n >= 700: self.mode, self.trees, self.bt, self.lags, self.rolls = "700+ TURBO MAX", 65, 10, [1,2,3,5,8], [3,5,10]
-        elif n >= 400: self.mode, self.trees, self.bt, self.lags, self.rolls = "400-699 TURBO", 55, 9, [1,2,3,5], [3,5,10]
-        else: self.mode, self.trees, self.bt, self.lags, self.rolls = "FAST MODE", 45, 8, [1,2,3], [3,5]
+        self.trees = 55
+        self.lags = [1, 2, 3, 5]
+        self.rolls = [3, 5, 10]
+        self.mode = "V.MAX TUNED"
+        
+        if n >= 700: self.bt = 10
+        elif n >= 400: self.bt = 9
+        else: self.bt = 8
 
         self.features = ["DOW", "Month", "Gap", "DOW_SIN", "DOW_COS", "MONTH_SIN", "MONTH_COS", "PrevSum", "PrevOdd", "DistHT", "DistTO"]
         for pos in ["H", "T", "O", "T2", "O2"]:
@@ -283,11 +292,10 @@ class EnsembleEngine:
             for lag in self.lags: self.features.append(f"L{lag}_{pos}")
             for w in self.rolls: 
                 self.features.append(f"RM{w}_{pos}")
-                self.features.append(f"RSTD{w}_{pos}")
 
         self.freq, self.calendar, self.transition, self.pattern, self.equation = FrequencyEngine(), CalendarEngine(), TransitionEngine(), PatternEngine(), EquationEngine()
-        self.ai = FastAI(self.trees, (0.35, 0.40, 0.25))
-        self.base_weights = {"AI": 0.50, "Freq": 0.15, "ST": 0.12, "Cal": 0.12, "BT": 0.08, "Eq": 0.03} # เพิ่มน้ำหนัก AI พื้นฐาน
+        self.ai = FastAI(self.trees, (0.35, 0.35, 0.30))
+        self.base_weights = {"AI": 0.50, "Freq": 0.15, "ST": 0.12, "Cal": 0.12, "BT": 0.08, "Eq": 0.03} 
 
     def backtest(self, pos, X, df_hist):
         n = len(X)
@@ -297,12 +305,18 @@ class EnsembleEngine:
         total_decay = 0.0
 
         for step, idx in enumerate(range(start, n)):
-            decay = 1.20 ** step # Adapt เร็วขึ้น
+            decay = 1.08 ** step
             total_decay += decay
             Xtr, ytr, xt, actual = X.iloc[:idx], df_hist[pos].iloc[:idx], X.iloc[[idx]], int(df_hist[pos].iloc[idx])
 
             try:
-                proxy = ExtraTreesClassifier(n_estimators=15, max_depth=6, max_features="sqrt", random_state=200+step)
+                proxy = ExtraTreesClassifier(
+                    n_estimators=10,
+                    max_depth=5,
+                    min_samples_leaf=3,
+                    max_features="sqrt",
+                    random_state=200+step
+                )
                 proxy.fit(Xtr, ytr)
                 tmp = np.zeros(10)
                 for c, p in zip(proxy.classes_, proxy.predict_proba(xt)[0]): tmp[int(c)] = p
@@ -321,11 +335,23 @@ class EnsembleEngine:
         accuracy = {k: v / total_decay for k, v in scores.items()}
 
         weighted = {}
-        for k in accuracy: weighted[k] = self.base_weights[k] * (0.35 + 0.65 * max(0.10, accuracy[k])) ** 2
+        for k in accuracy: 
+            weighted[k] = self.base_weights[k] * (0.35 + 0.65 * max(0.10, accuracy[k]))
         weighted["Eq"] = self.base_weights["Eq"] * 0.35
         
         total = sum(weighted.values())
-        return {k: v / total for k, v in weighted.items()}, f"WF HitRate {self.bt} งวด | AI {accuracy['AI']:.0%} | Freq {accuracy['Freq']:.0%} | Cal {accuracy['Cal']:.0%}"
+        weights_pct = {k: v / total for k, v in weighted.items()}
+
+        if weights_pct["AI"] > 0.58:
+            diff = weights_pct["AI"] - 0.58
+            weights_pct["AI"] = 0.58
+            other_sum = sum(v for k, v in weights_pct.items() if k != "AI")
+            if other_sum > 0:
+                for k in weights_pct:
+                    if k != "AI":
+                        weights_pct[k] += diff * (weights_pct[k] / other_sum)
+
+        return weights_pct, f"WF HitRate {self.bt} งวด | AI {accuracy['AI']:.0%} | Freq {accuracy['Freq']:.0%} | Cal {accuracy['Cal']:.0%}"
 
     def process_position(self, pos, hist, X, X_next, next_date):
         weights, bt_msg = self.backtest(pos, X, hist)
@@ -351,7 +377,7 @@ class EnsembleEngine:
         return {pos: self.process_position(pos, hist, X, X_next, next_date) for pos in ["H", "T", "O", "T2", "O2"]}, next_date
 
 # ============================================================
-# 12. UI FORMATTING HELPERS (สร้าง HTML UI ให้สวย)
+# 12. UI FORMATTING HELPERS 
 # ============================================================
 def html_top5(items):
     parts = [f'<span class="number-highlight">{n}</span>' for n, p in items]
@@ -400,7 +426,7 @@ if st.button("🚀 วิเคราะห์เลขเด่นด้วย 
             res = preds[pos]
             st.markdown(f'<div class="position-title">📍 {labels[pos]}</div>', unsafe_allow_html=True)
             
-            # การ์ด HOT TOP-5 (เลขใหญ่สีแดงเงาชัดเจน)
+            # การ์ด HOT TOP-5 
             st.markdown(f'''
                 <div class="hot-card">
                     <div style="font-weight:700; color:#444; margin-bottom:8px;">🔥 HOT TOP-5 (สรุปเด่นหลัก)</div>
@@ -409,12 +435,12 @@ if st.button("🚀 วิเคราะห์เลขเด่นด้วย 
                 </div>
             ''', unsafe_allow_html=True)
 
-            # ป้ายกำกับ 3-TOP (ดีไซน์ Badges)
+            # ป้ายกำกับ 3-TOP 
             st.markdown(f'<div class="info-row">🤖 <b>AI ท๊อป 3:</b> &nbsp; {html_badge(res["AI"], "badge-ai")}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="info-row">📊 <b>สถิติ ท๊อป 3:</b> &nbsp; {html_badge(res["Freq"], "badge-stat")}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="info-row">📅 <b>กำลังวัน ท๊อป 3:</b> &nbsp; {html_badge(res["Calendar"], "badge-cal")}</div>', unsafe_allow_html=True)
             
-            # ข้อมูลประกอบ (กราฟ, น้ำหนัก)
+            # ข้อมูลประกอบ
             st.markdown(f'<div style="font-size:13px; color:#999; margin-top:10px;">📈 {res["BT"]}</div>', unsafe_allow_html=True)
             W = res["Weights"]
             st.markdown(f'<div style="font-size:13px; color:#999;">⚖️ น้ำหนัก: AI {W["AI"]:.0%} | สถิติ {W["Freq"]:.0%} | วัน {W["Cal"]:.0%} | ก้าวเดิน {W["ST"]:.0%} | แพทเทิร์น {W["BT"]:.0%}</div>', unsafe_allow_html=True)
