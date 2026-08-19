@@ -1,7 +1,7 @@
 # ==============================================================================
 # 🛑 LOTTO AI PRO V7.7 NEURAL SINGULARITY (BASELINE 70% FIXED)
 # CONSENSUS VARIANCE PENALTY (FIXED) • MTBO Z-SCORE • SHRINKAGE WF WEIGHTS
-# CANDIDATE ELIMINATION TOP-7
+# CANDIDATE ELIMINATION TOP-7 + BACKTESTING UI
 # ENSEMBLE: ET + RF + HGB + LOGISTIC REGRESSION (TUNED)
 # ==============================================================================
 
@@ -309,13 +309,15 @@ class SingularityAI:
     def walk_forward(self, X, y, df):
         n = len(X)
         min_train, steps = self.cfg["min_train"], self.cfg["bt_steps"]
-        if n <= min_train + 2: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
+        if n <= min_train + 2: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0, "history": []}
             
         start = max(min_train, n - steps)
         indices = np.arange(start, n)
         proxy = ExtraTreesClassifier(n_estimators=30, max_depth=5, min_samples_leaf=4, random_state=99, n_jobs=-1)
         ai_hits, stat_hits, day_hits, count = 0, 0, 0, 0
         values = y.to_numpy(dtype=int)
+        
+        history = []
         
         for i in indices:
             X_train, y_train = X.iloc[:i], y.iloc[:i]
@@ -324,10 +326,11 @@ class SingularityAI:
                 proxy.fit(X_train, y_train)
                 p_ai = model_probs(proxy, X.iloc[[i]])
                 if actual in np.argsort(p_ai)[:7]: ai_hits += 1
-            except: pass
+            except: 
+                p_ai = np.ones(10) / 10
             
-            hist = values[:i]
-            p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(hist) + 0.6 * SingularityStatSystem.mtbo_skip(hist))
+            hist_vals = values[:i]
+            p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(hist_vals) + 0.6 * SingularityStatSystem.mtbo_skip(hist_vals))
             if actual in np.argsort(p_stat)[:7]: stat_hits += 1
             
             target_day = int(df.iloc[i]["date"].weekday())
@@ -335,8 +338,20 @@ class SingularityAI:
             if actual in np.argsort(p_day)[:7]: day_hits += 1
             count += 1
             
-        if count == 0: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0}
-        return {"ai": ai_hits/count, "stat": stat_hits/count, "day": day_hits/count, "steps": count}
+            # คำนวณผลลัพธ์จำลองเพื่อเก็บลงตารางประวัติ
+            combined_p = normalize_probs((p_ai + p_stat + p_day) / 3.0)
+            dead_7 = np.argsort(combined_p)[:7]
+            is_success = actual not in dead_7
+            
+            history.append({
+                "date": df.iloc[i]["date"].strftime('%d/%m/%Y'),
+                "actual": actual,
+                "dead_nums": sorted(dead_7.tolist()),
+                "is_success": is_success
+            })
+            
+        if count == 0: return {"ai": 0.5, "stat": 0.5, "day": 0.5, "steps": 0, "history": []}
+        return {"ai": ai_hits/count, "stat": stat_hits/count, "day": day_hits/count, "steps": count, "history": history}
 
     def analyze(self, target_date, target_dow):
         if self.n < 30: return None
@@ -355,105 +370,49 @@ class SingularityAI:
         base_ai, base_stat, base_day = 0.50, 0.35, 0.15
         
         if bt["steps"] > 0:
-            # Top-7 / 10 random baseline = 70%
             baseline = 0.70
-
-            # จำกัดอิทธิพลของ WF ไม่ให้แกว่งแรง
             strength = 2.5
 
-            ai_score = np.exp(
-                strength * (bt["ai"] - baseline)
-            )
+            ai_score = np.exp(strength * (bt["ai"] - baseline))
+            stat_score = np.exp(strength * (bt["stat"] - baseline))
+            day_score = np.exp(strength * (bt["day"] - baseline))
 
-            stat_score = np.exp(
-                strength * (bt["stat"] - baseline)
-            )
-
-            day_score = np.exp(
-                strength * (bt["day"] - baseline)
-            )
-
-            total = (
-                base_ai * ai_score +
-                base_stat * stat_score +
-                base_day * day_score
-            )
+            total = (base_ai * ai_score + base_stat * stat_score + base_day * day_score)
 
             wf_ai = (base_ai * ai_score) / total
             wf_stat = (base_stat * stat_score) / total
             wf_day = (base_day * day_score) / total
 
-            reliability = min(
-                1.0,
-                bt["steps"] / 15.0
-            )
+            reliability = min(1.0, bt["steps"] / 15.0)
+            shrink = 0.35 + (1.0 - reliability) * 0.25
 
-            shrink = (
-                0.35 +
-                (1.0 - reliability) * 0.25
-            )
-
-            w_ai = (
-                (1 - shrink) * wf_ai +
-                shrink * base_ai
-            )
-
-            w_stat = (
-                (1 - shrink) * wf_stat +
-                shrink * base_stat
-            )
-
-            w_day = (
-                (1 - shrink) * wf_day +
-                shrink * base_day
-            )
+            w_ai = (1 - shrink) * wf_ai + shrink * base_ai
+            w_stat = (1 - shrink) * wf_stat + shrink * base_stat
+            w_day = (1 - shrink) * wf_day + shrink * base_day
 
         else:
-            w_ai = base_ai
-            w_stat = base_stat
-            w_day = base_day
+            w_ai, w_stat, w_day = base_ai, base_stat, base_day
 
         ai_probs = self.train_predict(X_all, y_all, X_predict)
         seq = y_all.to_numpy(dtype=int)
         p_stat = normalize_probs((0.4 * SingularityStatSystem.markov_blend(seq)) + (0.6 * SingularityStatSystem.mtbo_skip(seq)))
         p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
         
-        mean_probs = (
-            w_ai * ai_probs +
-            w_stat * p_stat +
-            w_day * p_day
-        )
-
-        stacked_probs = np.vstack([
-            ai_probs,
-            p_stat,
-            p_day
-        ])
-
-        std_probs = np.std(
-            stacked_probs,
-            axis=0
-        )
-
+        mean_probs = (w_ai * ai_probs + w_stat * p_stat + w_day * p_day)
+        stacked_probs = np.vstack([ai_probs, p_stat, p_day])
+        std_probs = np.std(stacked_probs, axis=0)
+        
         variance_penalty = 0.60 * std_probs
-
         final_score = mean_probs - variance_penalty
-
-        final_score = np.maximum(
-            final_score,
-            1e-9
-        )
-
-        final = normalize_probs(
-            final_score,
-            temperature=1.0
-        )
+        final_score = np.maximum(final_score, 1e-9)
+        final = normalize_probs(final_score, temperature=1.0)
         
         return {
             "ai": ai_probs, "stat": p_stat, "day": p_day, "final": final,
             "w_ai": w_ai, "w_stat": w_stat, "w_day": w_day, 
             "bt_ai": bt["ai"], "bt_stat": bt["stat"], "bt_day": bt["day"], "bt_steps": bt["steps"],
-            "std_max": np.max(variance_penalty)
+            "std_max": np.max(variance_penalty),
+            "history": bt["history"]
         }
 
 # ==============================================================================
@@ -587,6 +546,33 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             )
             st.markdown(html_card, unsafe_allow_html=True)
             
+            # ==============================================================
+            # ตารางประวัติ (Backtesting History) ที่เพิ่มเข้ามา
+            # ==============================================================
+            with st.expander(f"🕰️ ดูประวัติการให้เลขดับย้อนหลัง 10 งวด ({position_name})", expanded=False):
+                if result.get("history"):
+                    recent_hist = result["history"][-10:][::-1]
+                    
+                    html_table = "<table style='width: 100%; text-align: center; border-collapse: collapse; font-family: sans-serif;'>"
+                    html_table += "<tr style='background-color: #f1f3f4; color: #333;'><th style='padding: 10px; border-bottom: 2px solid #ccc;'>งวดวันที่</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ระบบให้เลขดับ 7 ตัว</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ออกจริง</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ผลลัพธ์</th></tr>"
+                    
+                    for h in recent_hist:
+                        bg_color = "#F1F8E9" if h["is_success"] else "#FFEBEE"
+                        icon = "✅ <span style='color:#2E7D32; font-weight:bold;'>ดับอยู่</span>" if h["is_success"] else "❌ <span style='color:#C62828; font-weight:bold;'>ดับหลุด</span>"
+                        dead_str = " - ".join(map(str, h["dead_nums"]))
+                        
+                        html_table += f"<tr style='background-color: {bg_color}; border-bottom: 1px solid #ddd;'>"
+                        html_table += f"<td style='padding: 10px; color: #555;'>{h['date']}</td>"
+                        html_table += f"<td style='padding: 10px; font-weight: bold; color: #424242;'>{dead_str}</td>"
+                        html_table += f"<td style='padding: 10px; font-size: 16px; font-weight: 900; color: #000;'>{h['actual']}</td>"
+                        html_table += f"<td style='padding: 10px;'>{icon}</td>"
+                        html_table += "</tr>"
+                    
+                    html_table += "</table>"
+                    st.markdown(html_table, unsafe_allow_html=True)
+                else:
+                    st.info("ข้อมูลไม่เพียงพอสำหรับการสร้างตารางย้อนหลัง")
+            
         progress.empty()
 
         # ==============================================================================
@@ -620,4 +606,4 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
                 st.markdown(html_sum2, unsafe_allow_html=True)
                 
         st.divider()
-        st.caption("🛡️ V7.7 SINGULARITY: Fixed Negative Variance Penalty • Stabilized Shrinkage Weights • Baseline 70% Fixed")
+        st.caption("🛡️ V7.7 SINGULARITY: Fixed Negative Variance Penalty • Stabilized Shrinkage Weights • Baseline 70% Fixed • Added Backtesting History UI")
