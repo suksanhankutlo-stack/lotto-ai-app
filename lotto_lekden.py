@@ -1,5 +1,6 @@
 # ============================================================
 # 🚀 LOTTO AI ULTIMATE V.MAX 5-TOP (HIGH ACCURACY & SUPER CLEAR UI)
+# + BACKTESTING HISTORY 10 งวดล่าสุด
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -44,7 +45,7 @@ LOTTERY_SOURCES = {
 }
 
 # ============================================================
-# 2. UI STYLE (ปรับตัวเลขให้แจ่มชัด)
+# 2. UI STYLE 
 # ============================================================
 st.markdown("""
 <style>
@@ -61,7 +62,7 @@ st.markdown("""
     box-shadow: 0 4px 6px rgba(255, 75, 75, 0.1);
 }
 
-/* ตัวเลข 5-TOP ให้ใหญ่และเด่นสุดๆ */
+/* ตัวเลข 5-TOP */
 .number-highlight {
     font-size: 36px;
     font-weight: 900;
@@ -75,7 +76,7 @@ st.markdown("""
     margin: 0 10px;
 }
 
-/* ป้ายกำกับ 3-TOP (Badges) */
+/* Badges */
 .badge-ai { background: #E3F2FD; color: #1565C0; padding: 4px 12px; border-radius: 15px; font-weight: 800; font-size: 16px; border: 1px solid #BBDEFB;}
 .badge-stat { background: #E8F5E9; color: #2E7D32; padding: 4px 12px; border-radius: 15px; font-weight: 800; font-size: 16px; border: 1px solid #C8E6C9;}
 .badge-cal { background: #FFF3E0; color: #E65100; padding: 4px 12px; border-radius: 15px; font-weight: 800; font-size: 16px; border: 1px solid #FFE0B2;}
@@ -191,14 +192,7 @@ class FrequencyEngine:
 class CalendarEngine:
     def analyze(self, df, pos, next_date):
         subset = df[df["DOW"] == next_date.dayofweek]
-        
-        # กฎใหม่: ถ้าข้อมูลวันนั้นๆ มีไม่ถึง 25 งวด "ไม่ต้องคำนวณ"
-        if len(subset) < 25:
-            # คืนค่าความน่าจะเป็นแบบเป็นกลาง (ให้ทุกเลข 10% เท่ากัน)
-            # เพื่อให้ไม่มีเลขไหนได้เปรียบเสียเปรียบ
-            return np.ones(10) / 10
-            
-        # ถ้าข้อมูลถึง 25 งวด ค่อยคำนวณตามปกติ
+        if len(subset) < 25: return np.ones(10) / 10
         a = subset[pos].value_counts(normalize=True)
         b = subset.tail(25)[pos].value_counts(normalize=True)
         score = np.array([a.get(d, 0)*0.3 + b.get(d, 0)*0.7 for d in range(10)])
@@ -270,7 +264,7 @@ class FastAI:
         return result / result.sum()
 
 # ============================================================
-# 11. ENSEMBLE ENGINE
+# 11. ENSEMBLE ENGINE WITH BACKTEST HISTORY
 # ============================================================
 class EnsembleEngine:
     def __init__(self, df, lottery_name, target_dow=None):
@@ -280,7 +274,6 @@ class EnsembleEngine:
         self.trees = 55
         self.lags = [1, 2, 3, 5]
         self.rolls = [3, 5, 10]
-        self.mode = "V.MAX TUNED"
         
         if n >= 700: self.bt = 10
         elif n >= 400: self.bt = 9
@@ -299,39 +292,51 @@ class EnsembleEngine:
 
     def backtest(self, pos, X, df_hist):
         n = len(X)
-        if n < 45: return self.base_weights.copy(), "Backtest ข้อมูลน้อย"
+        if n < 45: return self.base_weights.copy(), "Backtest ข้อมูลน้อย", []
         start = max(35, n - self.bt)
         scores = {"AI": 0.0, "Freq": 0.0, "ST": 0.0, "Cal": 0.0, "BT": 0.0}
         total_decay = 0.0
+        
+        history = [] # เก็บประวัติทายผล
 
         for step, idx in enumerate(range(start, n)):
             decay = 1.08 ** step
             total_decay += decay
             Xtr, ytr, xt, actual = X.iloc[:idx], df_hist[pos].iloc[:idx], X.iloc[[idx]], int(df_hist[pos].iloc[idx])
+            target_date = df_hist["Date"].iloc[idx]
 
+            # Proxy AI
+            tmp = np.zeros(10)
             try:
-                proxy = ExtraTreesClassifier(
-                    n_estimators=10,
-                    max_depth=5,
-                    min_samples_leaf=3,
-                    max_features="sqrt",
-                    random_state=200+step
-                )
+                proxy = ExtraTreesClassifier(n_estimators=10, max_depth=5, min_samples_leaf=3, max_features="sqrt", random_state=200+step)
                 proxy.fit(Xtr, ytr)
-                tmp = np.zeros(10)
                 for c, p in zip(proxy.classes_, proxy.predict_proba(xt)[0]): tmp[int(c)] = p
                 if actual in np.argsort(tmp)[::-1][:5]: scores["AI"] += decay
             except: pass
 
-            hist, target_date = df_hist.iloc[:idx].copy(), df_hist["Date"].iloc[idx]
+            hist = df_hist.iloc[:idx].copy()
             f, c, s, b = self.freq.analyze(hist, pos), self.calendar.analyze(hist, pos, target_date), self.transition.analyze(hist, pos), self.pattern.analyze(hist, pos)
             
             if actual in np.argsort(f)[::-1][:5]: scores["Freq"] += decay
             if actual in np.argsort(c)[::-1][:5]: scores["Cal"] += decay
             if actual in np.argsort(s)[::-1][:5]: scores["ST"] += decay
             if actual in np.argsort(b)[::-1][:5]: scores["BT"] += decay
+            
+            # จำลองผลลัพธ์รวมสำหรับประวัติย้อนหลัง
+            combined = (self.base_weights["AI"]*tmp + self.base_weights["Freq"]*f + 
+                        self.base_weights["Cal"]*c + self.base_weights["ST"]*s + 
+                        self.base_weights["BT"]*b)
+            combined /= combined.sum()
+            top_5_ordered = np.argsort(combined)[::-1][:5].tolist()
+            
+            history.append({
+                "date": target_date.strftime('%d/%m/%Y'),
+                "actual": actual,
+                "top_5_ordered": top_5_ordered,
+                "is_success": actual in top_5_ordered
+            })
 
-        if total_decay <= 0: return self.base_weights.copy(), "Backtest error"
+        if total_decay <= 0: return self.base_weights.copy(), "Backtest error", []
         accuracy = {k: v / total_decay for k, v in scores.items()}
 
         weighted = {}
@@ -351,10 +356,10 @@ class EnsembleEngine:
                     if k != "AI":
                         weights_pct[k] += diff * (weights_pct[k] / other_sum)
 
-        return weights_pct, f"WF HitRate {self.bt} งวด | AI {accuracy['AI']:.0%} | Freq {accuracy['Freq']:.0%} | Cal {accuracy['Cal']:.0%}"
+        return weights_pct, f"WF HitRate {self.bt} งวด | AI {accuracy['AI']:.0%} | Freq {accuracy['Freq']:.0%} | Cal {accuracy['Cal']:.0%}", history[-10:]
 
     def process_position(self, pos, hist, X, X_next, next_date):
-        weights, bt_msg = self.backtest(pos, X, hist)
+        weights, bt_msg, history = self.backtest(pos, X, hist)
         ai, fq, cal = self.ai.predict(X, hist[pos], X_next), self.freq.analyze(hist, pos), self.calendar.analyze(hist, pos, next_date)
         stp, ptn, eq = self.transition.analyze(hist, pos), self.pattern.analyze(hist, pos), self.equation.analyze(hist)
 
@@ -362,7 +367,7 @@ class EnsembleEngine:
         final /= final.sum()
 
         top_n = lambda p, n: [(int(i), float(p[i])) for i in np.argsort(p)[::-1][:n]]
-        return {"Final": top_n(final, 5), "AI": top_n(ai, 3), "Freq": top_n(fq, 3), "Calendar": top_n(cal, 3), "Prob": final, "Weights": weights, "BT": bt_msg}
+        return {"Final": top_n(final, 5), "AI": top_n(ai, 3), "Freq": top_n(fq, 3), "Calendar": top_n(cal, 3), "Prob": final, "Weights": weights, "BT": bt_msg, "History": history}
 
     def predict_all(self):
         last_date = self.df["Date"].iloc[-1]
@@ -444,6 +449,42 @@ if st.button("🚀 วิเคราะห์เลขเด่นด้วย 
             st.markdown(f'<div style="font-size:13px; color:#999; margin-top:10px;">📈 {res["BT"]}</div>', unsafe_allow_html=True)
             W = res["Weights"]
             st.markdown(f'<div style="font-size:13px; color:#999;">⚖️ น้ำหนัก: AI {W["AI"]:.0%} | สถิติ {W["Freq"]:.0%} | วัน {W["Cal"]:.0%} | ก้าวเดิน {W["ST"]:.0%} | แพทเทิร์น {W["BT"]:.0%}</div>', unsafe_allow_html=True)
+            
+            # ----------------------------------------------------
+            # ส่วนตารางประวัติย้อนหลัง 10 งวด (ใหม่)
+            # ----------------------------------------------------
+            with st.expander(f"🕰️ ดูประวัติความแม่นยำย้อนหลัง 10 งวด ({labels[pos]})", expanded=False):
+                if res.get("History"):
+                    recent_hist = res["History"][::-1] # กลับด้านให้งวดล่าสุดอยู่บนสุด
+                    
+                    html_table = "<table style='width: 100%; text-align: center; border-collapse: collapse; font-family: sans-serif; margin-bottom: 10px;'>"
+                    html_table += "<tr style='background-color: #f1f3f4; color: #333;'><th style='padding: 10px; border-bottom: 2px solid #ccc;'>งวดวันที่</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ระบบให้เลขเด่น 5 ตัว</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ออกจริง</th><th style='padding: 10px; border-bottom: 2px solid #ccc;'>ผลลัพธ์</th></tr>"
+                    
+                    for h in recent_hist:
+                        bg_color = "#F1F8E9" if h["is_success"] else "#FFEBEE"
+                        icon = "✅ <span style='color:#2E7D32; font-weight:bold;'>เข้า (WIN)</span>" if h["is_success"] else "❌ <span style='color:#C62828; font-weight:bold;'>หลุด</span>"
+                        
+                        # ไฮไลต์ตัวเลขที่ออกจริงในกลุ่มที่ระบบทาย (ถ้ามี)
+                        top_5_str_parts = []
+                        for n in h["top_5_ordered"]:
+                            if n == h["actual"]:
+                                top_5_str_parts.append(f"<span style='color:#D32F2F; font-weight:900; font-size:16px;'>{n}</span>")
+                            else:
+                                top_5_str_parts.append(str(n))
+                        top_5_str = " - ".join(top_5_str_parts)
+                        
+                        html_table += f"<tr style='background-color: {bg_color}; border-bottom: 1px solid #ddd;'>"
+                        html_table += f"<td style='padding: 10px; color: #555; font-size:14px;'>{h['date']}</td>"
+                        html_table += f"<td style='padding: 10px; color: #424242;'>{top_5_str}</td>"
+                        html_table += f"<td style='padding: 10px; font-size: 16px; font-weight: 900; color: #000;'>{h['actual']}</td>"
+                        html_table += f"<td style='padding: 10px;'>{icon}</td>"
+                        html_table += "</tr>"
+                    
+                    html_table += "</table>"
+                    st.markdown(html_table, unsafe_allow_html=True)
+                else:
+                    st.info("ข้อมูลไม่เพียงพอสำหรับการสร้างตารางย้อนหลัง")
+                    
             st.write("")
 
         # ภาพรวม
@@ -452,4 +493,4 @@ if st.button("🚀 วิเคราะห์เลขเด่นด้วย 
         st.markdown(f'<div class="hot-card"><div style="font-weight:700; color:#444;">🔥 HOT 5-TOP รูด/วิ่ง (บน)</div><div style="text-align:center; margin:10px 0;">{html_top5(hot_top)}</div><div style="font-size:13px; color:#888; text-align:center;">{nums_prob(hot_top)}</div></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="hot-card"><div style="font-weight:700; color:#444;">🔥 HOT 5-TOP รูด/วิ่ง (ล่าง)</div><div style="text-align:center; margin:10px 0;">{html_top5(hot_bot)}</div><div style="font-size:13px; color:#888; text-align:center;">{nums_prob(hot_bot)}</div></div>', unsafe_allow_html=True)
 
-        st.success("✅ วิเคราะห์เสร็จสิ้น • อัปเกรดความแม่นยำและ UI เรียบร้อยแล้ว")
+        st.success("✅ วิเคราะห์เสร็จสิ้น • อัปเกรดความแม่นยำและเพิ่มฟีเจอร์ Backtesting ย้อนหลังเรียบร้อยแล้ว")
