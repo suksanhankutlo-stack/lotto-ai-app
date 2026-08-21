@@ -2622,141 +2622,43 @@ f"""
                     # ------------------------------------------------
 
                     html_table = """
-                    <div style="
-                        overflow-x:auto;
-                    ">
-                    <table style="
-                        width:100%;
-                        text-align:center;
-                        border-collapse:collapse;
-                        font-family:sans-serif;
-                        font-size:13px;
-                    ">
-                    """
-
-                    html_table += """
-                    <tr style="
-                        background:#f1f3f4;
-                        color:#333;
-                    ">
-                        <th style="
-                            padding:9px;
-                            border-bottom:2px solid #ccc;
-                        ">
-                            วันที่
-                        </th>
-
-                        <th style="
-                            padding:9px;
-                            border-bottom:2px solid #ccc;
-                        ">
-                            TOP-5
-                        </th>
-
-                        <th style="
-                            padding:9px;
-                            border-bottom:2px solid #ccc;
-                        ">
-                            จริง
-                        </th>
-
-                        <th style="
-                            padding:9px;
-                            border-bottom:2px solid #ccc;
-                        ">
-                            ผล
-                        </th>
-                    </tr>
-                    """
+<div style="overflow-x:auto;">
+<table style="width:100%; text-align:center; border-collapse:collapse; font-family:sans-serif; font-size:13px;">
+<tr style="background:#f1f3f4; color:#333;">
+    <th style="padding:9px; border-bottom:2px solid #ccc;">วันที่</th>
+    <th style="padding:9px; border-bottom:2px solid #ccc;">TOP-5</th>
+    <th style="padding:9px; border-bottom:2px solid #ccc;">จริง</th>
+    <th style="padding:9px; border-bottom:2px solid #ccc;">ผล</th>
+</tr>
+"""
 
                     for h in recent_hist:
 
-                        bg = (
-                            "#F1F8E9"
-                            if h["is_success"]
-                            else "#FFEBEE"
-                        )
-
-                        icon = (
-                            "✅ WIN"
-                            if h["is_success"]
-                            else "❌ หลุด"
-                        )
+                        bg = "#F1F8E9" if h["is_success"] else "#FFEBEE"
+                        icon = "✅ WIN" if h["is_success"] else "❌ หลุด"
 
                         parts = []
-
-                        for n in h[
-                            "top_5_ordered"
-                        ]:
-
-                            if n == h[
-                                "actual"
-                            ]:
-
-                                parts.append(
-                                    f'''
-                                    <span style="
-                                        color:#D32F2F;
-                                        font-weight:900;
-                                        font-size:16px;
-                                    ">
-                                        {n}
-                                    </span>
-                                    '''
-                                )
-
+                        for n in h["top_5_ordered"]:
+                            if n == h["actual"]:
+                                parts.append(f'<span style="color:#D32F2F; font-weight:900; font-size:16px;">{n}</span>')
                             else:
+                                parts.append(str(n))
 
-                                parts.append(
-                                    str(n)
-                                )
-
-                        top5_str = (
-                            " - ".join(parts)
-                        )
+                        top5_str = " - ".join(parts)
 
                         html_table += f"""
-                        <tr style="
-                            background:{bg};
-                            border-bottom:1px solid #ddd;
-                        ">
-
-                            <td style="
-                                padding:9px;
-                            ">
-                                {h["date"]}
-                            </td>
-
-                            <td style="
-                                padding:9px;
-                                font-weight:700;
-                            ">
-                                {top5_str}
-                            </td>
-
-                            <td style="
-                                padding:9px;
-                                font-size:16px;
-                                font-weight:900;
-                            ">
-                                {h["actual"]}
-                            </td>
-
-                            <td style="
-                                padding:9px;
-                                font-weight:800;
-                            ">
-                                {icon}
-                            </td>
-
-                        </tr>
-                        """
+<tr style="background:{bg}; border-bottom:1px solid #ddd;">
+    <td style="padding:9px;">{h["date"]}</td>
+    <td style="padding:9px; font-weight:700;">{top5_str}</td>
+    <td style="padding:9px; font-size:16px; font-weight:900;">{h["actual"]}</td>
+    <td style="padding:9px; font-weight:800;">{icon}</td>
+</tr>
+"""
 
                     html_table += """
-                    </table>
-                    </div>
-                    """
-
+</table>
+</div>
+"""
                     st.markdown(
                         html_table,
                         unsafe_allow_html=True
