@@ -2429,35 +2429,19 @@ if st.button(
             # ------------------------------------------------
 
             st.markdown(
-                f'''
-                <div class="hot-card">
-
-                    <div style="
-                        font-weight:700;
-                        color:#444;
-                        margin-bottom:8px;
-                    ">
-                        🔥 HOT TOP-5
-                    </div>
-
-                    <div style="
-                        text-align:center;
-                        margin:10px 0;
-                    ">
-                        {html_top5(res["Final"])}
-                    </div>
-
-                    <div style="
-                        font-size:13px;
-                        color:#888;
-                        text-align:center;
-                        margin-top:8px;
-                    ">
-                        {nums_prob(res["Final"])}
-                    </div>
-
-                </div>
-                ''',
+f"""
+<div class="hot-card">
+    <div style="font-weight:700; color:#444; margin-bottom:8px;">
+        🔥 HOT TOP-5
+    </div>
+    <div style="text-align:center; margin:10px 0;">
+        {html_top5(res["Final"])}
+    </div>
+    <div style="font-size:13px; color:#888; text-align:center; margin-top:8px;">
+        {nums_prob(res["Final"])}
+    </div>
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -2466,44 +2450,29 @@ if st.button(
             # ------------------------------------------------
 
             st.markdown(
-                f'''
-                <div class="info-row">
-                    🤖 <b>AI TOP-3:</b>
-                    &nbsp;
-                    {html_badge(
-                        res["AI"],
-                        "badge-ai"
-                    )}
-                </div>
-                ''',
+f"""
+<div class="info-row">
+    🤖 <b>AI TOP-3:</b> &nbsp; {html_badge(res["AI"], "badge-ai")}
+</div>
+""",
                 unsafe_allow_html=True
             )
 
             st.markdown(
-                f'''
-                <div class="info-row">
-                    📊 <b>สถิติ TOP-3:</b>
-                    &nbsp;
-                    {html_badge(
-                        res["Freq"],
-                        "badge-stat"
-                    )}
-                </div>
-                ''',
+f"""
+<div class="info-row">
+    📊 <b>สถิติ TOP-3:</b> &nbsp; {html_badge(res["Freq"], "badge-stat")}
+</div>
+""",
                 unsafe_allow_html=True
             )
 
             st.markdown(
-                f'''
-                <div class="info-row">
-                    📅 <b>กำลังวัน TOP-3:</b>
-                    &nbsp;
-                    {html_badge(
-                        res["Calendar"],
-                        "badge-cal"
-                    )}
-                </div>
-                ''',
+f"""
+<div class="info-row">
+    📅 <b>กำลังวัน TOP-3:</b> &nbsp; {html_badge(res["Calendar"], "badge-cal")}
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -2512,11 +2481,11 @@ if st.button(
             # ------------------------------------------------
 
             st.markdown(
-                f'''
-                <div class="small-muted">
-                    📈 {res["BT"]}
-                </div>
-                ''',
+f"""
+<div class="small-muted">
+    📈 {res["BT"]}
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -2562,39 +2531,22 @@ if st.button(
                     )
 
                     st.markdown(
-                        f'''
-                        <div style="
-                            display:flex;
-                            gap:6px;
-                            margin-top:8px;
-                        ">
-
-                            <div class="stat-box"
-                                 style="flex:1;">
-                                <b>Top-1</b><br>
-                                {top1_pct:.0%}
-                            </div>
-
-                            <div class="stat-box"
-                                 style="flex:1;">
-                                <b>Top-3</b><br>
-                                {top3_pct:.0%}
-                            </div>
-
-                            <div class="stat-box"
-                                 style="flex:1;">
-                                <b>Top-5</b><br>
-                                {top5_pct:.0%}
-                            </div>
-
-                            <div class="stat-box"
-                                 style="flex:1;">
-                                <b>LogLoss</b><br>
-                                {ll_text}
-                            </div>
-
-                        </div>
-                        ''',
+f"""
+<div style="display:flex; gap:6px; margin-top:8px;">
+    <div class="stat-box" style="flex:1;">
+        <b>Top-1</b><br>{top1_pct:.0%}
+    </div>
+    <div class="stat-box" style="flex:1;">
+        <b>Top-3</b><br>{top3_pct:.0%}
+    </div>
+    <div class="stat-box" style="flex:1;">
+        <b>Top-5</b><br>{top5_pct:.0%}
+    </div>
+    <div class="stat-box" style="flex:1;">
+        <b>LogLoss</b><br>{ll_text}
+    </div>
+</div>
+""",
                         unsafe_allow_html=True
                     )
 
@@ -2607,17 +2559,11 @@ if st.button(
             ]
 
             st.markdown(
-                f'''
-                <div class="small-muted">
-                    ⚖️ น้ำหนัก:
-                    AI {W["AI"]:.0%} |
-                    สถิติ {W["Freq"]:.0%} |
-                    วัน {W["Cal"]:.0%} |
-                    ก้าวเดิน {W["ST"]:.0%} |
-                    Pattern {W["Pattern"]:.0%} |
-                    Eq {W["Eq"]:.0%}
-                </div>
-                ''',
+f"""
+<div class="small-muted">
+    ⚖️ น้ำหนัก: AI {W["AI"]:.0%} | สถิติ {W["Freq"]:.0%} | วัน {W["Cal"]:.0%} | ก้าวเดิน {W["ST"]:.0%} | Pattern {W["Pattern"]:.0%} | Eq {W["Eq"]:.0%}
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -2663,15 +2609,11 @@ if st.button(
                     )
 
                     st.markdown(
-                        f'''
-                        <div class="stat-box">
-                            🏆 TOP-5 เข้า
-                            <b>
-                            {wins}/{total_hist}
-                            </b>
-                            ({rate:.0%})
-                        </div>
-                        ''',
+f"""
+<div class="stat-box">
+    🏆 TOP-5 เข้า <b>{wins}/{total_hist}</b> ({rate:.0%})
+</div>
+""",
                         unsafe_allow_html=True
                     )
 
@@ -2853,33 +2795,19 @@ if st.button(
         # ----------------------------------------------------
 
         st.markdown(
-            f'''
-            <div class="hot-card">
-
-                <div style="
-                    font-weight:700;
-                    color:#444;
-                ">
-                    🔥 HOT 5-TOP รูด/วิ่ง — บน
-                </div>
-
-                <div style="
-                    text-align:center;
-                    margin:10px 0;
-                ">
-                    {html_top5(hot_top)}
-                </div>
-
-                <div style="
-                    font-size:13px;
-                    color:#888;
-                    text-align:center;
-                ">
-                    {nums_prob(hot_top)}
-                </div>
-
-            </div>
-            ''',
+f"""
+<div class="hot-card">
+    <div style="font-weight:700; color:#444; margin-bottom:8px;">
+        🔥 HOT 5-TOP รูด/วิ่ง — บน
+    </div>
+    <div style="text-align:center; margin:10px 0;">
+        {html_top5(hot_top)}
+    </div>
+    <div style="font-size:13px; color:#888; text-align:center; margin-top:8px;">
+        {nums_prob(hot_top)}
+    </div>
+</div>
+""",
             unsafe_allow_html=True
         )
 
@@ -2888,33 +2816,19 @@ if st.button(
         # ----------------------------------------------------
 
         st.markdown(
-            f'''
-            <div class="hot-card">
-
-                <div style="
-                    font-weight:700;
-                    color:#444;
-                ">
-                    🔥 HOT 5-TOP รูด/วิ่ง — ล่าง
-                </div>
-
-                <div style="
-                    text-align:center;
-                    margin:10px 0;
-                ">
-                    {html_top5(hot_bottom)}
-                </div>
-
-                <div style="
-                    font-size:13px;
-                    color:#888;
-                    text-align:center;
-                ">
-                    {nums_prob(hot_bottom)}
-                </div>
-
-            </div>
-            ''',
+f"""
+<div class="hot-card">
+    <div style="font-weight:700; color:#444; margin-bottom:8px;">
+        🔥 HOT 5-TOP รูด/วิ่ง — ล่าง
+    </div>
+    <div style="text-align:center; margin:10px 0;">
+        {html_top5(hot_bottom)}
+    </div>
+    <div style="font-size:13px; color:#888; text-align:center; margin-top:8px;">
+        {nums_prob(hot_bottom)}
+    </div>
+</div>
+""",
             unsafe_allow_html=True
         )
 
@@ -2934,4 +2848,4 @@ if st.button(
         st.caption(
             "หมายเหตุ: ผลลัพธ์เป็นการจัดอันดับความน่าจะเป็นจากข้อมูลย้อนหลัง "
             "ไม่สามารถรับประกันผลรางวัลจริงได้"
-)
+        )
