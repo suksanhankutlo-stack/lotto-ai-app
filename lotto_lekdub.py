@@ -1,6 +1,6 @@
 # ==============================================================================
-# 🛑 LOTTO AI PRO V7.9 STABLE CONSENSUS EDITION
-# UPGRADES: ANTI-OVERFITTING • HIGHER SMOOTHING • TEMPERATURE SCALING
+# 🛑 LOTTO AI PRO V8.1 ULTRA-FAST & COMBINED HISTORY EDITION
+# NUMPY-ONLY WF • ROBUST SCALER • HGB OPTIMIZED • COMBINED BACKTEST
 # ============================================================================
 
 import streamlit as st
@@ -14,7 +14,7 @@ from datetime import timedelta
 
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.base import clone
 
@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 # ==============================================================================
 
 st.set_page_config(
-    page_title="ระบบวิเคราะห์เลขดับ PRO V7.9 STABLE CONSENSUS",
+    page_title="ระบบวิเคราะห์เลขดับ PRO V8.1 ULTRA-FAST",
     page_icon="🛑",
     layout="centered",
 )
@@ -83,14 +83,10 @@ def fetch_data(lotto_name):
         return None
 
 def get_adaptive_config(n):
-    # ปรับ max_depth ให้ตื้นขึ้นเพื่อป้องกัน Overfitting จาก Noise
-    if n >= 700:
-        return {"mode": "STABLE CONSENSUS 700+", "trees": 120, "rf_trees": 60, "max_depth": 5, "bt_steps": 12, "min_train": 60, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 20], "wf_recent": 5}
-    if n >= 400:
-        return {"mode": "STABLE CONSENSUS 400-699", "trees": 100, "rf_trees": 50, "max_depth": 4, "bt_steps": 10, "min_train": 50, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10, 15], "wf_recent": 5}
-    if n >= 200:
-        return {"mode": "STABLE CONSENSUS 200-399", "trees": 80, "rf_trees": 40, "max_depth": 4, "bt_steps": 8, "min_train": 40, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10], "wf_recent": 4}
-    return {"mode": "STABLE CONSENSUS 30-199", "trees": 60, "rf_trees": 30, "max_depth": 3, "bt_steps": 6, "min_train": 30, "lags": [1, 2, 3], "rolls": [3, 5], "wf_recent": 4}
+    if n >= 700: return {"mode": "ULTRA-FAST 700+", "trees": 120, "rf_trees": 60, "max_depth": 5, "bt_steps": 12, "min_train": 60, "lags": [1, 2, 3, 5, 8, 13], "rolls": [3, 5, 10, 20], "wf_recent": 5}
+    if n >= 400: return {"mode": "ULTRA-FAST 400-699", "trees": 100, "rf_trees": 50, "max_depth": 4, "bt_steps": 10, "min_train": 50, "lags": [1, 2, 3, 5, 8], "rolls": [3, 5, 10, 15], "wf_recent": 5}
+    if n >= 200: return {"mode": "ULTRA-FAST 200-399", "trees": 80, "rf_trees": 40, "max_depth": 4, "bt_steps": 8, "min_train": 40, "lags": [1, 2, 3, 5], "rolls": [3, 5, 10], "wf_recent": 4}
+    return {"mode": "ULTRA-FAST 30-199", "trees": 60, "rf_trees": 30, "max_depth": 3, "bt_steps": 6, "min_train": 30, "lags": [1, 2, 3], "rolls": [3, 5], "wf_recent": 4}
 
 @st.cache_data(show_spinner=False)
 def build_features_cached(df, target_col, lags, rolls):
@@ -138,7 +134,7 @@ class SingularityStatSystem:
         if len(seq) < 15: return np.ones(10) / 10
         mask = seq[:-1] == seq[-1]
         counts = np.bincount(seq[1:][mask], minlength=10).astype(float)
-        counts += 2.5 # [UPDATE]: เพิ่ม Smoothing เพื่อลด Overconfidence ของความสุ่ม
+        counts += 2.5 
         return normalize_probs(counts)
 
     @staticmethod
@@ -146,7 +142,6 @@ class SingularityStatSystem:
         seq = np.asarray(seq, dtype=int)
         if len(seq) == 0: return np.ones(10) / 10
         result = np.zeros(10, dtype=float)
-        global_repeat_rate = np.mean(seq[1:] == seq[:-1]) if len(seq) > 1 else 0.1
         for d in range(10):
             pos = np.where(seq == d)[0]
             if len(pos) > 1:
@@ -156,7 +151,7 @@ class SingularityStatSystem:
                 avg_gap, std_gap = 10.0, 5.0
             current_gap = len(seq) - pos[-1] - 1 if len(pos) else 60
             z = (current_gap - avg_gap) / std_gap
-            prob_z = 1 / (1 + np.exp(-np.clip(z, -8, 8))) # [UPDATE]: คลิป Z-score ให้แคบลง
+            prob_z = 1 / (1 + np.exp(-np.clip(z, -6, 6)))
             freq = np.mean(seq == d)
             result[d] = (0.7 * prob_z) + (0.3 * freq)
         return normalize_probs(result)
@@ -166,26 +161,26 @@ class SingularityStatSystem:
         mask = df["date"].dt.weekday == target_dow
         values = df.loc[mask, target_col].astype(int).to_numpy()
         counts = np.bincount(values, minlength=10).astype(float)
-        counts += 3.0 # [UPDATE]: เพิ่มตัวหารดึงเข้าค่า Uniform ลดปัญหาจำข้อมูลจาก Sample size เล็กๆ
+        counts += 3.0 
         return normalize_probs(counts)
 
 def make_models(cfg):
     return {
-        "LR": make_pipeline(StandardScaler(), LogisticRegression(max_iter=160, C=0.08, random_state=42)),
-        "ET": ExtraTreesClassifier(n_estimators=cfg["trees"], max_depth=cfg["max_depth"], min_samples_leaf=6, max_features="sqrt", random_state=43, n_jobs=-1), # [UPDATE] min_samples_leaf=6
+        "LR": make_pipeline(RobustScaler(), LogisticRegression(max_iter=150, C=0.08, random_state=42)),
+        "ET": ExtraTreesClassifier(n_estimators=cfg["trees"], max_depth=cfg["max_depth"], min_samples_leaf=6, max_features="sqrt", random_state=43, n_jobs=-1),
         "RF": RandomForestClassifier(n_estimators=cfg["rf_trees"], max_depth=cfg["max_depth"], min_samples_leaf=6, max_features="log2", random_state=44, n_jobs=-1),
-        "HGB": HistGradientBoostingClassifier(max_iter=50, max_depth=cfg["max_depth"], learning_rate=0.03, min_samples_leaf=8, l2_regularization=3.5, random_state=45), # [UPDATE] regularize แน่นขึ้น
+        "HGB": HistGradientBoostingClassifier(max_iter=50, max_depth=cfg["max_depth"], max_bins=128, learning_rate=0.03, min_samples_leaf=8, l2_regularization=3.5, random_state=45), 
     }
 
-def model_probs(model, X):
+def model_probs(model, X_np):
     try:
         if hasattr(model, "predict_proba"):
-            raw = model.predict_proba(X)[0]
+            raw = model.predict_proba(X_np)[0]
             result = np.zeros(10, dtype=float)
             for i, cls in enumerate(model.classes_): result[int(cls)] = raw[i]
             return normalize_probs(result)
-        else: # For RidgeClassifier
-            raw = model.decision_function(X)[0]
+        else:
+            raw = model.decision_function(X_np)[0]
             exp_raw = np.exp(raw - np.max(raw))
             result = np.zeros(10, dtype=float)
             for i, cls in enumerate(model.classes_): result[int(cls)] = exp_raw[i]
@@ -193,7 +188,7 @@ def model_probs(model, X):
     except: return np.ones(10)/10
 
 @st.cache_data(show_spinner=False)
-def cached_walk_forward(X_np, y_np, dates_np, cfg_tuple, target_values_np, target_dow_values_np):
+def cached_walk_forward(X_np, y_np, dates_np, cfg_tuple, target_dow_values_np):
     min_train, steps = map(int, cfg_tuple)
     n = len(y_np)
     if n <= min_train + 2: return {"ai":0.5, "stat":0.5, "day":0.5, "steps":0, "history":[], "ai_hits":[], "stat_hits":[], "day_hits":[]}
@@ -203,27 +198,36 @@ def cached_walk_forward(X_np, y_np, dates_np, cfg_tuple, target_values_np, targe
     ai_hits, stat_hits, day_hits, history = [], [], [], []
 
     for i in indices:
-        X_train, y_train, actual = pd.DataFrame(X_np[:i]), y_np[:i], int(y_np[i])
-        X_one = pd.DataFrame(X_np[i:i+1])
+        X_train_np = X_np[:i]
+        X_one_np = X_np[i:i+1]
+        y_train_np = y_np[:i]
+        actual = int(y_np[i])
 
-        # [UPDATE] ใช้ RidgeClassifier ที่เสถียรและเร็วมากๆ ในการทำ WF Proxy (ลดความแปรปรวนจาก Tree)
-        proxy_model = make_pipeline(StandardScaler(), RidgeClassifier(alpha=5.0, random_state=i))
+        proxy_model = make_pipeline(RobustScaler(), RidgeClassifier(alpha=5.0, random_state=i))
         try:
-            proxy_model.fit(X_train, y_train)
-            p_ai = model_probs(proxy_model, X_one)
+            proxy_model.fit(X_train_np, y_train_np)
+            p_ai = model_probs(proxy_model, X_one_np)
         except: p_ai = np.ones(10)/10
         
-        hist_vals = y_np[:i]
-        p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(hist_vals) + 0.6 * SingularityStatSystem.mtbo_skip(hist_vals))
-        p_day = SingularityStatSystem.day_probability(pd.DataFrame({"date": dates[:i], "v": hist_vals}), "v", target_dow_values_np[i])
+        p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(y_train_np) + 0.6 * SingularityStatSystem.mtbo_skip(y_train_np))
+        p_day = SingularityStatSystem.day_probability(pd.DataFrame({"date": dates[:i], "v": y_train_np}), "v", target_dow_values_np[i])
 
         ai_hit = int(actual in np.argsort(p_ai)[-7:])
         stat_hit = int(actual in np.argsort(p_stat)[-7:])
         day_hit = int(actual in np.argsort(p_day)[-7:])
         ai_hits.append(ai_hit); stat_hits.append(stat_hit); day_hits.append(day_hit)
         
-        dead_7 = sorted(np.argsort(normalize_probs((p_ai + p_stat + p_day) / 3.0))[:7].tolist())
-        history.append({"date": dates[i].strftime("%d/%m/%Y"), "actual": actual, "dead_nums": dead_7, "is_success": actual not in dead_7})
+        step_combo_prob = normalize_probs((p_ai + p_stat + p_day) / 3.0)
+        dead_7 = sorted(np.argsort(step_combo_prob)[:7].tolist())
+        
+        # [NEW] เก็บ prob ของแต่ละ step เพื่อนำไปหาค่าเฉลี่ยในประวัติ "ดับรวม"
+        history.append({
+            "date": dates[i].strftime("%d/%m/%Y"), 
+            "actual": actual, 
+            "dead_nums": dead_7, 
+            "is_success": actual not in dead_7,
+            "prob": step_combo_prob.tolist() 
+        })
 
     return {"ai": np.mean(ai_hits), "stat": np.mean(stat_hits), "day": np.mean(day_hits), "steps": len(ai_hits), "history": history, "ai_hits": ai_hits, "stat_hits": stat_hits, "day_hits": day_hits}
 
@@ -236,8 +240,8 @@ def cached_ai_predict(X_train_np, y_train_np, X_predict_np, cfg_tuple):
     for name, base in models.items():
         w = weights[name]
         try:
-            m = clone(base).fit(pd.DataFrame(X_train_np), y_train_np)
-            result += model_probs(m, pd.DataFrame(X_predict_np)) * w
+            m = clone(base).fit(X_train_np, y_train_np)
+            result += model_probs(m, X_predict_np) * w
             total += w
         except: continue
     return normalize_probs(result / total) if total > 0 else np.ones(10)/10
@@ -253,7 +257,7 @@ def calculate_dynamic_weights(bt, base=(0.50, 0.35, 0.15), recent_k=5):
         scores.append(score); stabilities.append(stab)
 
     scores = np.asarray(scores)
-    excess = np.clip(scores - 0.70, -0.10, 0.10) # ลด excess cap
+    excess = np.clip(scores - 0.70, -0.10, 0.10) 
     signal = np.exp(1.8 * excess)
     raw = np.asarray(base) * signal * (0.85 + 0.15 * np.asarray(stabilities))
     
@@ -266,12 +270,11 @@ def final_consensus(ai, stat, day, w_ai, w_stat, w_day, n):
     mean_probs = w_ai * ai + w_stat * stat + w_day * day
     std_probs = np.std(stack, axis=0)
 
-    penalty_factor = float(np.interp(n, [30, 200, 800], [0.15, 0.22, 0.30])) # ลด penalty เล็กน้อย
+    penalty_factor = float(np.interp(n, [30, 200, 800], [0.15, 0.22, 0.30])) 
     variance_penalty = penalty_factor * std_probs
     consensus_bonus = 0.05 * (1.0 - np.clip(std_probs / 0.20, 0, 1)) * mean_probs
 
     score = mean_probs - variance_penalty + consensus_bonus
-    # [UPDATE]: ใส่ temperature=1.15 เพื่อเกลี่ยค่าลด Overconfidence
     return normalize_probs(np.maximum(score, 1e-9), temperature=1.15), float(np.max(variance_penalty)), float(np.max(consensus_bonus))
 
 class SingularityAI:
@@ -287,17 +290,16 @@ class SingularityAI:
         features = build_features_cached(extended, self.target_col, tuple(self.cfg["lags"]), tuple(self.cfg["rolls"]))
 
         drop_cols = ["date", "draw_num", "hundred", "ten", "unit", "bot_ten", "bot_unit", self.target_col]
-        X_all = features.iloc[:-1].drop(columns=drop_cols, errors="ignore")
-        X_pred = features.iloc[[-1]][X_all.columns]
-        y_all = self.df[self.target_col].astype(int)
+        X_all = features.iloc[:-1].drop(columns=drop_cols, errors="ignore").to_numpy(dtype=np.float32)
+        X_pred = features.iloc[[-1]].drop(columns=drop_cols, errors="ignore").to_numpy(dtype=np.float32)
+        y_all = self.df[self.target_col].to_numpy(dtype=int)
 
-        bt = cached_walk_forward(X_all.to_numpy(dtype=np.float32), y_all.to_numpy(dtype=int), self.df["date"].to_numpy(), (self.cfg["min_train"], self.cfg["bt_steps"]), y_all.to_numpy(dtype=int), self.df["date"].dt.weekday.to_numpy(dtype=int))
+        bt = cached_walk_forward(X_all, y_all, self.df["date"].to_numpy(), (self.cfg["min_train"], self.cfg["bt_steps"]), self.df["date"].dt.weekday.to_numpy(dtype=int))
         weights = calculate_dynamic_weights(bt, recent_k=self.cfg["wf_recent"])
         
-        ai_probs = cached_ai_predict(X_all.to_numpy(dtype=np.float32), y_all.to_numpy(dtype=int), X_pred.to_numpy(dtype=np.float32), (self.cfg["trees"], self.cfg["rf_trees"], self.cfg["max_depth"]))
+        ai_probs = cached_ai_predict(X_all, y_all, X_pred, (self.cfg["trees"], self.cfg["rf_trees"], self.cfg["max_depth"]))
         
-        seq = y_all.to_numpy(dtype=int)
-        p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(seq) + 0.6 * SingularityStatSystem.mtbo_skip(seq))
+        p_stat = normalize_probs(0.4 * SingularityStatSystem.markov_blend(y_all) + 0.6 * SingularityStatSystem.mtbo_skip(y_all))
         p_day = SingularityStatSystem.day_probability(self.df, self.target_col, target_dow)
 
         final, std_max, consensus_max = final_consensus(ai_probs, p_stat, p_day, weights["w_ai"], weights["w_stat"], weights["w_day"], self.n)
@@ -315,16 +317,16 @@ def target_date_from_last(df, dow_input):
     delta = 7 if (dow_input - last_date.weekday()) % 7 == 0 else (dow_input - last_date.weekday()) % 7
     return last_date + timedelta(days=delta), dow_input
 
-st.markdown('<div class="main-title">🛑 LOTTO AI PRO V7.9</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">STABLE CONSENSUS • ANTI-OVERFITTING • SMOOTHED PROBABILITY</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🛑 LOTTO AI PRO V8.1</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">ULTRA-FAST • ROBUST SCALER • COMBINED BACKTEST</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 target_lotto = col1.selectbox("🎯 เลือกหวย", list(LOTTO_URLS.keys()), index=0)
 day_options = {"อัตโนมัติ (จากงวดล่าสุด)": None, "วันจันทร์": 0, "วันอังคาร": 1, "วันพุธ": 2, "วันพฤหัสบดี": 3, "วันศุกร์": 4, "วันเสาร์": 5, "วันอาทิตย์": 6}
 dow_input = day_options[col2.selectbox("📅 ออกวัน", list(day_options.keys()), index=0)]
 
-if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡ V7.9 STABLE RUN", type="primary", use_container_width=True):
-    with st.spinner("⚡ V7.9 กำลังคำนวณ Stable Consensus & Anti-Overfitting..."):
+if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡ V8.1 RUN", type="primary", use_container_width=True):
+    with st.spinner("⚡ V8.1 กำลังวิเคราะห์และตรวจสอบประวัติดับรวมย้อนหลัง..."):
         df = fetch_data(target_lotto)
         if df is None or df.empty: st.error("❌ ไม่สามารถดึงข้อมูลได้"); st.stop()
 
@@ -332,7 +334,9 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
         st.info(f"📅 **งวดเป้าหมาย:** วัน{['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'][target_dow]} {target_date.strftime('%d/%m/%Y')} | อ้างอิง {len(df)} งวด")
 
         store_final_probs = {}
-        progress = st.progress(0, text="Init V7.9 Stable Engine...")
+        store_histories = {} # [NEW] เก็บประวัติเพื่อนำมาคำนวณดับรวม
+        
+        progress = st.progress(0, text="Init V8.1 Engine...")
         positions = {"💯 3 ตัวบน (ร้อย)": "hundred", "🔟 3 ตัวบน (สิบ)": "ten", "1️⃣ 3 ตัวบน (หน่วย)": "unit", "🔽 2 ตัวล่าง (สิบ)": "bot_ten", "⬇️ 2 ตัวล่าง (หน่วย)": "bot_unit"}
 
         for pos_idx, (position_name, col) in enumerate(positions.items(), start=1):
@@ -341,13 +345,15 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
             if not result: continue
 
             store_final_probs[col] = result["final"]
+            store_histories[col] = result["history"]
+            
             dead_final, dead_ai, dead_stat, dead_day = map(lambda p: get_dead_numbers(p, 7), [result["final"], result["ai"], result["stat"], result["day"]])
 
             html_card = (
                 f'<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;box-shadow:0 8px 20px rgba(0,0,0,.06);padding:20px;margin-bottom:20px">'
                 f'<div style="font-size:20px;font-weight:900;color:#222;border-bottom:2px solid #f0f0f0;padding-bottom:10px;margin-bottom:15px">{position_name}</div>'
                 f'<div style="background:linear-gradient(135deg,#fff5f5,#ffebee);border:2px solid #ffcdd2;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">'
-                f'<div style="color:#D32F2F;font-weight:800;font-size:15px;margin-bottom:8px">🚫 ดับเอกฉันท์ 7 ตัว (V7.9)</div>'
+                f'<div style="color:#D32F2F;font-weight:800;font-size:15px;margin-bottom:8px">🚫 ดับเอกฉันท์ 7 ตัว (V8.1)</div>'
                 f'<div style="font-size:36px;font-weight:900;color:#B71C1C;letter-spacing:8px">{format_dead(dead_final)}</div></div>'
                 f'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">'
                 f'<div style="display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;padding:12px 15px;border-radius:8px;border-left:4px solid #1976D2"><span style="font-size:14px">🤖 <b>AI Ensemble</b></span><span style="color:#1565C0;font-weight:800">{format_dead(dead_ai)}</span></div>'
@@ -365,12 +371,71 @@ if st.button("🛑 วิเคราะห์เลขดับ 7 ตัว ⚡
 
         progress.empty()
 
+        # ====================================================================
+        # สรุปและแสดงประวัติดับรวม (Combined History)
+        # ====================================================================
         st.subheader("🔥 สรุปเลขดับเอกฉันท์ (รวม)")
         c1, c2 = st.columns(2)
+        
+        # --- ประวัติดับบนรวม ---
         if all(x in store_final_probs for x in ["hundred", "ten", "unit"]):
-            c1.markdown(f'<div style="background:#fff5f5;padding:20px;border-radius:12px;border:2px solid #ffcdd2;text-align:center;font-weight:900;color:#B71C1C">🚫 ดับบนรวม 7 ตัว<br><span style="font-size:28px;letter-spacing:4px">{format_dead(get_dead_numbers(normalize_probs(sum(store_final_probs[k] for k in ["hundred", "ten", "unit"])/3), 7))}</span></div>', unsafe_allow_html=True)
+            top_probs = normalize_probs(sum(store_final_probs[k] for k in ["hundred", "ten", "unit"])/3)
+            c1.markdown(f'<div style="background:#fff5f5;padding:20px;border-radius:12px;border:2px solid #ffcdd2;text-align:center;font-weight:900;color:#B71C1C">🚫 ดับบนรวม 7 ตัว<br><span style="font-size:28px;letter-spacing:4px">{format_dead(get_dead_numbers(top_probs, 7))}</span></div>', unsafe_allow_html=True)
+            
+            top_hist_list = []
+            hist_len = min(len(store_histories["hundred"]), 10)
+            for i in range(-1, -hist_len - 1, -1):
+                try:
+                    date = store_histories["hundred"][i]["date"]
+                    # ผสานความน่าจะเป็นย้อนหลังทั้ง 3 หลัก
+                    combo_p = normalize_probs((np.array(store_histories["hundred"][i]["prob"]) + np.array(store_histories["ten"][i]["prob"]) + np.array(store_histories["unit"][i]["prob"])) / 3.0)
+                    dead_7 = sorted(np.argsort(combo_p)[:7].tolist())
+                    
+                    act_h, act_t, act_u = store_histories["hundred"][i]["actual"], store_histories["ten"][i]["actual"], store_histories["unit"][i]["actual"]
+                    # [กติกาความสำเร็จ]: เลขที่ออกจริงทั้งร้อย สิบ หน่วย ต้อง "ไม่ตรง" กับเลขดับรวมเลยแม้แต่ตัวเดียว
+                    is_success = not any(d in dead_7 for d in [act_h, act_t, act_u])
+                    
+                    top_hist_list.append({
+                        "งวดวันที่": date,
+                        "ดับบนรวม 7 ตัว": " - ".join(map(str, dead_7)),
+                        "ออกจริง (3ตัว)": f"{act_h}{act_t}{act_u}",
+                        "ผล": "✅ ดับอยู่" if is_success else "❌ หลุด"
+                    })
+                except: continue
+
+            if top_hist_list:
+                with c1.expander("🕰️ ประวัติดับบนรวม 10 งวดล่าสุด"):
+                    st.dataframe(pd.DataFrame(top_hist_list), use_container_width=True, hide_index=True)
+
+        # --- ประวัติดับล่างรวม ---
         if all(x in store_final_probs for x in ["bot_ten", "bot_unit"]):
-            c2.markdown(f'<div style="background:#fff5f5;padding:20px;border-radius:12px;border:2px solid #ffcdd2;text-align:center;font-weight:900;color:#B71C1C">🚫 ดับล่างรวม 7 ตัว<br><span style="font-size:28px;letter-spacing:4px">{format_dead(get_dead_numbers(normalize_probs(sum(store_final_probs[k] for k in ["bot_ten", "bot_unit"])/2), 7))}</span></div>', unsafe_allow_html=True)
+            bot_probs = normalize_probs(sum(store_final_probs[k] for k in ["bot_ten", "bot_unit"])/2)
+            c2.markdown(f'<div style="background:#fff5f5;padding:20px;border-radius:12px;border:2px solid #ffcdd2;text-align:center;font-weight:900;color:#B71C1C">🚫 ดับล่างรวม 7 ตัว<br><span style="font-size:28px;letter-spacing:4px">{format_dead(get_dead_numbers(bot_probs, 7))}</span></div>', unsafe_allow_html=True)
+            
+            bot_hist_list = []
+            hist_len = min(len(store_histories["bot_ten"]), 10)
+            for i in range(-1, -hist_len - 1, -1):
+                try:
+                    date = store_histories["bot_ten"][i]["date"]
+                    # ผสานความน่าจะเป็นย้อนหลังทั้ง 2 หลัก
+                    combo_p = normalize_probs((np.array(store_histories["bot_ten"][i]["prob"]) + np.array(store_histories["bot_unit"][i]["prob"])) / 2.0)
+                    dead_7 = sorted(np.argsort(combo_p)[:7].tolist())
+                    
+                    act_bt, act_bu = store_histories["bot_ten"][i]["actual"], store_histories["bot_unit"][i]["actual"]
+                    # [กติกาความสำเร็จ]: เลขที่ออกจริงทั้งสิบและหน่วยล่าง ต้อง "ไม่ตรง" กับเลขดับรวม
+                    is_success = not any(d in dead_7 for d in [act_bt, act_bu])
+                    
+                    bot_hist_list.append({
+                        "งวดวันที่": date,
+                        "ดับล่างรวม 7 ตัว": " - ".join(map(str, dead_7)),
+                        "ออกจริง (2ตัว)": f"{act_bt}{act_bu}",
+                        "ผล": "✅ ดับอยู่" if is_success else "❌ หลุด"
+                    })
+                except: continue
+
+            if bot_hist_list:
+                with c2.expander("🕰️ ประวัติดับล่างรวม 10 งวดล่าสุด"):
+                    st.dataframe(pd.DataFrame(bot_hist_list), use_container_width=True, hide_index=True)
 
         st.divider()
-        st.caption("🛡️ V7.9 STABLE UPGRADE: ควบคุม Overfitting • เพิ่ม Laplace Smoothing • ลดความสวิงของค่าสถิติด้วย Temperature Scaling")
+        st.caption("🛡️ V8.1 ULTRA-FAST + COMBINED HISTORY: เพิ่มการเช็คประวัติย้อนหลังสำหรับชุดเลข 'ดับรวม' (Combined Probability Checker) • ระบบประมวลผลเร็วด้วย Numpy Vectorization")
