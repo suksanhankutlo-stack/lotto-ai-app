@@ -1,5 +1,5 @@
 # ============================================================
-# 🚀 LOTTO AI ULTIMATE V.MAX 5-TOP TURBO (UPDATED)
+# 🚀 LOTTO AI ULTIMATE V.MAX 5-TOP TURBO (FIXED)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -474,7 +474,6 @@ def combine_top_n(preds, positions, n=5):
     return [(int(i), float(score[i])) for i in np.argsort(score)[::-1][:n]]
 
 def render_overall_history(preds, pos_list, title):
-    # Retrieve and merge histories based on the requested positions
     if not preds[pos_list[0]].get("History"): return ""
     
     n_hist = len(preds[pos_list[0]]["History"])
@@ -555,8 +554,10 @@ if st.button("🚀 วิเคราะห์เลขเด่นด้วย 
             st.markdown(f'<div class="info-row">🤖 <b>AI TOP-3:</b> &nbsp; {html_badge(res["AI"], "badge-ai")}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="info-row">📊 <b>สถิติ TOP-3:</b> &nbsp; {html_badge(res["Freq"], "badge-stat")}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="info-row">📅 <b>กำลังวัน TOP-3:</b> &nbsp; {html_badge(res["Calendar"], "badge-cal")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="small-muted">📈 {res["BT"]}</div>', unsafe_allow_html=True) W = res["Weights"]
             
+            st.markdown(f'<div class="small-muted">📈 {res["BT"]}</div>', unsafe_allow_html=True)
+            
+            W = res["Weights"]
             st.markdown(f'<div class="small-muted">⚖️ น้ำหนัก: AI {W["AI"]:.0%} | สถิติ {W["Freq"]:.0%} | วัน {W["Cal"]:.0%} | ก้าวเดิน {W["ST"]:.0%} | Pattern {W["Pattern"]:.0%} | Eq {W["Eq"]:.0%}</div>', unsafe_allow_html=True)
 
         hot_top = combine_top_n(preds, ["H", "T", "O"])
